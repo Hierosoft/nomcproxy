@@ -35,16 +35,25 @@ Must be run as root from the `nomcproxy` directory (or with the files present).
 
 ```bash
 sudo python3 install.py --dynamic myhost.example.net
+# optionally also proxy a Pterodactyl panel:
+sudo python3 install.py --dynamic myhost.example.net --pterodactyl
 ```
 
 `HOSTNAME` must be a WAN hostname (contains a dot, not an IP address).
 Installs `/etc/cron.d/nomcproxy` that runs every 5 minutes and performs an
 immediate first update.
 
+`--pterodactyl` (optional) adds a second stream listener on the typical HTTPS
+port (443) that forwards to the private server’s atypical panel port (8443).
+Afterward open `https://<public-proxy-domain-or-ip>` — the home IP and
+dynamic hostname remain hidden.
+
 ### Static (one-time)
 
 ```bash
 sudo python3 install.py --static 203.0.113.42
+# or with panel proxy:
+sudo python3 install.py --static 203.0.113.42 --pterodactyl
 ```
 
 Writes the conf once and reloads nginx or Angie. No cron job is installed.
@@ -122,6 +131,23 @@ chmod +x install-and-run-java-latest-mc.py install-and-run-java8-blightfall.py
 ```
 
 See `install-on-target-only/server.md` for the private-server notes.
+
+### Optional: Pterodactyl on the private server
+
+Instead of a plain jar you can run Pterodactyl on the home machine:
+
+```bash
+# on the home server
+sudo python3 install-on-target-only/install-pterodactyl-instead.py --latest
+# or
+sudo python3 install-on-target-only/install-pterodactyl-instead.py --blightfall
+```
+
+The script requires `--latest` or `--blightfall`, configures (or documents)
+the panel on atypical port 8443, and prints egg/yolk steps plus the router
+ports to forward. Then on the public proxy re-run `install.py` with
+`--pterodactyl` so the panel is available on normal port 443 via the same
+public address used for Minecraft.
 
 ## Stream block inclusion
 

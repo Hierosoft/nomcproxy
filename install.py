@@ -3,13 +3,15 @@
 Installer for nomcproxy.
 
 Usage:
-  sudo python3 install.py --dynamic example.dyndns.org
-  sudo python3 install.py --static 203.0.113.42
+  sudo python3 install.py --dynamic example.dyndns.org [--pterodactyl]
+  sudo python3 install.py --static 203.0.113.42 [--pterodactyl]
 
---dynamic  Installs a cron.d entry that periodically updates the conf
-           from the given hostname.
---static   One-time generation of the conf for the given IP, then reload.
-           Does not install a cron job.
+--dynamic      Installs a cron.d entry that periodically updates the conf
+               from the given hostname.
+--static       One-time generation of the conf for the given IP, then reload.
+               Does not install a cron job.
+--pterodactyl  Also proxy the Pterodactyl panel (public port 443 → private
+               atypical port). Optional.
 """
 
 from __future__ import annotations
@@ -82,14 +84,31 @@ def main() -> int:
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--dynamic", metavar="HOSTNAME", help="Install cron updater for a dynamic hostname")
     group.add_argument("--static", metavar="IP", help="One-time static IP configuration")
+    parser.add_argument(
+        "--pterodactyl",
+        action="store_true",
+        help="Also reverse-proxy the Pterodactyl panel (public 443 → private atypical port)",
+    )
     args = parser.parse_args()
+
+    if args.pterodactyl:
+        nomcproxy.set_pterodactyl_enabled(True)
+        print(
+            f"Pterodactyl proxy enabled: public port {nomcproxy.PTERODACTYL_PROXY_PORT} "
+            f"→ private port {nomcproxy.PTERODACTYL_PRIVATE_PORT}"
+        )
+        print(
+            "Access the panel at https://<your-public-proxy-domain-or-ip> "
+            "(same address you give players for Minecraft). "
+            "The home/private IP and dynamic hostname stay hidden."
+        )
 
     if args.static:
         if nomcproxy.is_dynamic_address(args.static):
             echo0(f"Error: --static cannot be used with a dynamic-DNS hostname: {args.static}")
             return 1
         try:
-            nomcproxy.apply_static(args.static)
+            nomcproxy.apply_static(args.static, include_pterodactyl=args.pterodactyl)
             print(f"Static configuration applied for {args.static}")
         except Exception as e:
             echo0(f"Error: {e}")

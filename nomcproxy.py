@@ -24,6 +24,13 @@ LISTEN_PORT = 25565
 BACKEND_PORT = 25565
 LOG_FILE = Path("/var/log/nomcproxy.log")
 
+# Pterodactyl panel proxy ports
+# Private (home) server listens on the atypical port; the public proxy
+# exposes the typical HTTPS port.
+PTERODACTYL_PRIVATE_PORT = 8443
+PTERODACTYL_PROXY_PORT = 443
+PTERODACTYL_MARKER = Path("/etc/nomcproxy/enable-pterodactyl")
+
 # Known dynamic-DNS provider domain suffixes.
 # An address is considered dynamic if it equals or ends with one of these.
 DYNAMIC_DNS_HOSTS = frozenset({
@@ -207,19 +214,43 @@ def extract_ip(content: str) -> str | None:
     return match.group(1) if match else None
 
 
-def make_conf(ip: str, comment: str = "") -> str:
+def make_conf(ip: str, comment: str = "", include_pterodactyl: bool = False) -> str:
     header = "# Managed by nomcproxy — do not edit by hand\n"
     if comment:
         header += f"# {comment}\n"
-    return f"""{header}stream {{
+    body = f"""{header}stream {{
     server {{
         listen {LISTEN_PORT};
         proxy_pass {ip}:{BACKEND_PORT};
         proxy_timeout 10m;
         proxy_connect_timeout 5s;
     }}
-}}
 """
+    if include_pterodactyl:
+        body += f"""
+    # Pterodactyl panel: public typical port → private atypical port
+    server {{
+        listen {PTERODACTYL_PROXY_PORT};
+        proxy_pass {ip}:{PTERODACTYL_PRIVATE_PORT};
+        proxy_timeout 10m;
+        proxy_connect_timeout 5s;
+    }}
+"""
+    body += "}\n"
+    return body
+
+
+def pterodactyl_enabled() -> bool:
+    return PTERODACTYL_MARKER.is_file()
+
+
+def set_pterodactyl_enabled(enabled: bool) -> None:
+    PTERODACTYL_MARKER.parent.mkdir(parents=True, exist_ok=True)
+    if enabled:
+        PTERODACTYL_MARKER.write_text("enabled\n")
+        os.chmod(PTERODACTYL_MARKER, 0o644)
+    elif PTERODACTYL_MARKER.exists():
+        PTERODACTYL_MARKER.unlink()
 
 
 def reload_service(service: str) -> None:
@@ -236,11 +267,11 @@ def reload_service(service: str) -> None:
         raise
 
 
-def write_conf(ip: str, comment: str = "") -> tuple[Path, str]:
+def write_conf(ip: str, comment: str = "", include_pterodactyl: bool = False) -> tuple[Path, str]:
     """Write conf for the given IP and return (path, service)."""
     angie_running = is_service_active("angie")
     conf_path, service = choose_paths(angie_running)
-    conf_path.write_text(make_conf(ip, comment))
+    conf_path.write_text(make_conf(ip, comment, include_pterodactyl))
     os.chmod(conf_path, 0o644)
     return conf_path, service
 
@@ -271,13 +302,13 @@ def update_dynamic(hostname: str) -> None:
         return
 
     log.info("Updating conf: %s → %s", current_ip or "missing", ip)
-    conf_path.write_text(make_conf(ip, f"Upstream: {hostname}"))
+    conf_path.write_text(make_conf(ip, f"Upstream: {hostname}", pterodactyl_enabled()))
     os.chmod(conf_path, 0o644)
     reload_service(service)
     log.info("Update complete")
 
 
-def apply_static(ip: str) -> None:
+def apply_static(ip: str, include_pterodactyl: bool = False) -> None:
     """One-time write of conf for a static address and reload."""
     if is_dynamic_address(ip):
         raise ValueError(
@@ -287,7 +318,8 @@ def apply_static(ip: str) -> None:
         raise ValueError(f"Invalid IPv4 address: {ip}")
 
     assert_not_self(ip, "static target")
-    conf_path, service = write_conf(ip, "Static upstream")
+    set_pterodactyl_enabled(include_pterodactyl)
+    conf_path, service = write_conf(ip, "Static upstream", include_pterodactyl)
     log.info("Wrote static conf %s → %s", conf_path, ip)
     reload_service(service)
     log.info("Static configuration applied")

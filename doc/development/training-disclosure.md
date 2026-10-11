@@ -21,7 +21,7 @@ tool(s) used:
 Scope of use: code described in subsections--typically modified by hand to improve logic, variable naming, integration, etc, but in this commit, unmodified.
 
 ## AGENTS.md, install.py, nomcproxy.py, README.md, install-on-target-only/*
-- https://grok.com/c/c897f443-5e2b-446b-acff-f8d0f9602669?rid=2ecdaf04-895a-4736-a7ee-1ebe7f7e1779
+- 2026-10-11 https://grok.com/c/c897f443-5e2b-446b-acff-f8d0f9602669?rid=2ecdaf04-895a-4736-a7ee-1ebe7f7e1779
   - shared: https://grok.com/share/c2hhcmQtMg_51cbbc9c-39bd-4206-a702-c9a70ded36a6
 
 What is the bets self-hosted minecraft proxy for Blightfall (modded Minecraft 1.7.10) and what are the recommended specs for 1-8 players? I want to get it on a vps (probably racknerd) preferably, unless a proxy service is less than $10/mo
@@ -57,3 +57,7 @@ def echo0(*args, **kwargs) -> None:
     print(*args, **kwargs)
 ```
 and return a number. Say "Error: " explicitly instead of in the function.
+
+- 2026-10-11
+
+For the private server add a install-pterodactyl-instead.py script to install pterodactyl instead (detect if angie, nginx, or apache2 is running if applicable/necessary for pterodactyl) in the install-on-target-only folder; run it on an atypical port if possible to script that configuration. Tell the user what ports to forward on their router for pterodactyl and minecraft (may vary depending on whether using 1.7.10* or latest; provide both instructions when installing pterodactyl since that may install any version; but explain how to install the egg for Vanilla or for Blightfall, and the java8 yolk in the latter case. Automate using CLI args for the new script if possible to do the egg and yolk from the CLI; and if that is possible, require --latest or --blightfall arg otherwise do not install anything. Detect if pterodactyl was already installed, and if so, install only the egg, and yolk if applicable, or if can't be automated then explain how. After install, explain to the user they must use the --pterodactyl option when using the proxy install script, and explain to the user they can access pterodactyl through the proxy on the same publicly-shared domain as the public minecraft address without revealing the home/other private IP address or dynamic domain). Add a pterydactyl option to install.py (optional) which will proxy pterydactyl on whatever port the private server will use, but on the proxy server use the typical port. Instruct the user how to access it when done.
