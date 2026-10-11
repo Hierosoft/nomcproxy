@@ -1,10 +1,10 @@
 # Server (private / home) side of nomcproxy
 
-This folder is part of the [nomcproxy](https://github.com/hierosoft/nomcproxy) project.
+This folder is part of the [nomcproxy](https://github.com/Hierosoft/nomcproxy) project.
 
 **This folder is for the private (home or other secret) Minecraft server only.**
 
-- Run the scripts in this directory on the machine that hosts the actual Minecraft world (vanilla or Blightfall).
+- Run the scripts in this directory on the machine that hosts the actual Minecraft world (vanilla with latest Java, or Blightfall with Java 8).
 - **Do not** install or run the nomcproxy proxy scripts (from the repository root) on this machine.
 - The nomcproxy scripts in the repository root belong on the **public proxy** (VPS). That proxy hides this server’s IP address and dynamic hostname from players.
 
@@ -19,7 +19,7 @@ Keep that hostname and the home IP private — give players only the public prox
 When you run one of the install scripts in this folder it will:
 
 - Place server files under `/opt/minecraft/<name>`  
-  (`latest` or `1.7.10-blightfall`)
+  (`vanilla` or `1.7.10-blightfall`)
 - Record the installed name in `/opt/minecraft/nomcproxy.list` (no duplicates)
 - Copy this file to `/opt/minecraft/server.md`
 - Create an XDG desktop shortcut that opens the nomcproxy repository root

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Install Pterodactyl on the private (home) server instead of a plain jar.
 
-Usage (must pass exactly one of --latest or --blightfall):
-  sudo python3 install-pterodactyl-instead.py --latest
+Usage (must pass exactly one of --vanilla or --blightfall):
+  sudo python3 install-pterodactyl-instead.py --vanilla
   sudo python3 install-pterodactyl-instead.py --blightfall
 
 Places the panel on an atypical port (8443). After this finishes you must
@@ -10,9 +10,10 @@ run the nomcproxy installer on the public proxy with --pterodactyl so the
 panel is reachable on the normal HTTPS port without exposing the home IP
 or dynamic hostname.
 
-Detects an existing web server (angie, nginx, apache2) when configuring
-the panel. If Pterodactyl is already installed, only egg/yolk guidance
-(and any automatable steps) are performed.
+When apt (or apt-get) is available, installs PHP 8.3 and the dependencies
+listed at https://docs.pterodactyl.io/v1/panel/getting-started and starts
+php8.3-fpm. Detects an existing web server (angie, nginx, apache2).
+If Pterodactyl is already installed, only egg/yolk guidance is performed.
 """
 
 from __future__ import annotations
@@ -28,13 +29,43 @@ TARGET_SCRIPTS_DIR = os.path.dirname(os.path.realpath(__file__))
 REPO_DIR = os.path.dirname(TARGET_SCRIPTS_DIR)
 sys.path.insert(0, REPO_DIR)
 
-PANEL_PORT = 8443          # atypical port on the private server
-PROXY_PORT = 443           # typical port exposed by the public proxy
-MINECRAFT_PORT = 25565     # default allocation for both vanilla and Blightfall
+PANEL_PORT = 8443
+PROXY_PORT = 443
+MINECRAFT_PORT = 25565
 WINGS_API_PORT = 8080
 WINGS_SFTP_PORT = 2022
 
 PANEL_DIR = Path("/var/www/pterodactyl")
+PHP_FPM_SERVICE = "php8.3-fpm"
+PHP_FPM_SOCK = "/run/php/php8.3-fpm.sock"
+
+# Packages from https://docs.pterodactyl.io/v1/panel/getting-started
+PHP_PACKAGES = [
+    "php8.3",
+    "php8.3-common",
+    "php8.3-cli",
+    "php8.3-gd",
+    "php8.3-mysql",
+    "php8.3-mbstring",
+    "php8.3-bcmath",
+    "php8.3-xml",
+    "php8.3-fpm",
+    "php8.3-curl",
+    "php8.3-zip",
+]
+OTHER_PACKAGES = [
+    "mariadb-server",
+    "nginx",
+    "tar",
+    "unzip",
+    "git",
+    "redis-server",
+    "curl",
+    "software-properties-common",
+    "apt-transport-https",
+    "ca-certificates",
+    "gnupg",
+]
 
 
 def echo0(*args, **kwargs) -> None:
@@ -64,19 +95,66 @@ def pterodactyl_installed() -> bool:
     return PANEL_DIR.is_dir() and (PANEL_DIR / "artisan").is_file()
 
 
+def apt_cmd() -> str | None:
+    """Prefer apt, fall back to apt-get."""
+    if shutil.which("apt"):
+        return "apt"
+    if shutil.which("apt-get"):
+        return "apt-get"
+    return None
+
+
+def run_apt(args: list[str]) -> int:
+    cmd = apt_cmd()
+    if not cmd:
+        echo0("Error: neither apt nor apt-get found; skipping package install")
+        return 1
+    full = ["sudo", cmd] + args
+    print(f"Running: {' '.join(full)}")
+    return subprocess.run(full).returncode
+
+
+def install_php_and_deps() -> int:
+    """Install PHP 8.3 and Pterodactyl dependencies if apt is available."""
+    if not apt_cmd():
+        echo0("apt/apt-get not available; skipping PHP 8.3 and dependency install.")
+        echo0("Install the packages listed at")
+        echo0("https://docs.pterodactyl.io/v1/panel/getting-started manually.")
+        return 1
+
+    print("Installing PHP 8.3 and Pterodactyl panel dependencies...")
+    if run_apt(["update"]) != 0:
+        echo0("Error: apt update failed")
+        return 1
+
+    packages = PHP_PACKAGES + OTHER_PACKAGES
+    if run_apt(["install", "-y"] + packages) != 0:
+        echo0("Error: package install failed")
+        return 1
+
+    # Start and enable php8.3-fpm
+    print(f"Starting {PHP_FPM_SERVICE}...")
+    subprocess.run(["sudo", "systemctl", "enable", "--now", PHP_FPM_SERVICE], check=False)
+    if is_service_active(PHP_FPM_SERVICE):
+        print(f"{PHP_FPM_SERVICE} is active")
+    else:
+        echo0(f"Warning: {PHP_FPM_SERVICE} did not become active; check systemctl status")
+    return 0
+
+
 def print_port_forward_instructions() -> None:
     print()
     print("=" * 60)
     print("Router port forwards (on the home/private network)")
     print("=" * 60)
-    print(f"Forward these TCP ports to this machine so the public proxy can reach them:")
+    print("Forward these TCP ports to this machine so the public proxy can reach them:")
     print(f"  {PANEL_PORT}/tcp   Pterodactyl panel (atypical; proxy exposes it as {PROXY_PORT})")
     print(f"  {MINECRAFT_PORT}/tcp   Minecraft game (default allocation)")
     print(f"  {WINGS_API_PORT}/tcp   Wings API (needed if the panel manages this node)")
     print(f"  {WINGS_SFTP_PORT}/tcp   Wings SFTP")
     print()
     print("Minecraft port notes:")
-    print("  - Latest vanilla and Blightfall both default to 25565.")
+    print("  - Vanilla and Blightfall both default to 25565.")
     print("  - If you allocate a different port in the panel, forward that port instead")
     print("    and update the nomcproxy backend port to match.")
     print()
@@ -92,12 +170,12 @@ def print_egg_instructions(mode: str) -> None:
     print("=" * 60)
     print(f"Egg / yolk for {mode}")
     print("=" * 60)
-    if mode == "latest":
-        print("Vanilla (latest) egg:")
+    if mode == "vanilla":
+        print("Vanilla egg:")
         print("  1. In the panel go to Admin → Nests → Import Egg.")
         print("  2. Use the official Minecraft Vanilla / Paper egg from")
         print("     https://github.com/pterodactyl/game-eggs (minecraft/java/vanilla or paper).")
-        print("  3. Default yolk is a modern Java image (java_21 / java_25). No special yolk needed.")
+        print("  3. Default yolk is a latest-Java image (java_21 / java_25). No special yolk needed.")
         print("  4. Create a server, allocate port 25565 (or your chosen port), start it.")
     else:
         print("Blightfall (1.7.10) egg:")
@@ -115,13 +193,14 @@ def print_egg_instructions(mode: str) -> None:
 
 
 def configure_webserver_port(webserver: str | None) -> None:
-    """Best-effort note / stub for binding the panel to the atypical port."""
+    """Print config using php8.3-fpm for nginx/angie."""
     print()
     print(f"Detected web server: {webserver or 'none'}")
     print(f"Configure the panel site to listen on port {PANEL_PORT} (not 80/443).")
+    print(f"PHP-FPM socket: {PHP_FPM_SOCK}")
     if webserver in ("nginx", "angie"):
         conf_dir = "/etc/angie/conf.d" if webserver == "angie" else "/etc/nginx/conf.d"
-        print(f"Example ({webserver}) server block snippet for {conf_dir}/pterodactyl.conf:")
+        print(f"Example ({webserver}) server block for {conf_dir}/pterodactyl.conf:")
         print(f"""
 server {{
     listen {PANEL_PORT};
@@ -136,34 +215,17 @@ server {{
     location ~ \\.php$ {{
         include fastcgi_params;
         fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
-        fastcgi_pass unix:/run/php/php-fpm.sock;  # adjust socket path
+        fastcgi_pass unix:{PHP_FPM_SOCK};
     }}
 }}
 """)
-        print(f"Then reload {webserver}.")
+        print(f"Ensure {PHP_FPM_SERVICE} is running, then reload {webserver}.")
     elif webserver == "apache2":
-        print("For Apache, set Listen {PANEL_PORT} and a VirtualHost on that port,")
-        print("then a2enmod rewrite proxy_fcgi and reload apache2.")
+        print(f"For Apache, set Listen {PANEL_PORT} and a VirtualHost on that port.")
+        print(f"Enable proxy_fcgi and point PHP to {PHP_FPM_SOCK}, then reload apache2.")
     else:
         print("Install nginx or apache2, then bind the panel to port", PANEL_PORT)
-
-
-def install_panel_stub() -> int:
-    """Minimal guidance + dependency check. Full install follows official docs."""
-    print("Pterodactyl panel not detected.")
-    print("This script does not perform a full unattended panel install")
-    print("(it needs interactive DB passwords and an admin user).")
-    print()
-    print("Recommended steps:")
-    print("  1. Follow the official panel install:")
-    print("     https://pterodactyl.io/panel/1.0/getting_started.html")
-    print(f"  2. When configuring the web server, use port {PANEL_PORT} instead of 80/443.")
-    print("  3. Install Wings on this same machine:")
-    print("     https://pterodactyl.io/wings/1.0/installing.html")
-    print("  4. Re-run this script with the same --latest or --blightfall flag;")
-    print("     it will then only handle egg/yolk guidance.")
-    configure_webserver_port(detect_webserver())
-    return 0
+        print(f"and pass PHP to {PHP_FPM_SOCK}.")
 
 
 def main() -> int:
@@ -171,23 +233,32 @@ def main() -> int:
         description="Install or configure Pterodactyl on the private server"
     )
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("--latest", action="store_true", help="Prepare for latest vanilla Minecraft")
+    group.add_argument("--vanilla", action="store_true", help="Prepare for vanilla Minecraft")
     group.add_argument("--blightfall", action="store_true", help="Prepare for Blightfall (1.7.10)")
     args = parser.parse_args()
 
-    mode = "latest" if args.latest else "blightfall"
+    mode = "vanilla" if args.vanilla else "blightfall"
 
     if os.geteuid() != 0:
         echo0("Error: must be run as root")
         return 1
 
+    # Always attempt PHP 8.3 + deps when apt is present
+    install_php_and_deps()
+
     already = pterodactyl_installed()
     if already:
-        print("Pterodactyl panel already installed; skipping base install.")
-        configure_webserver_port(detect_webserver())
+        print("Pterodactyl panel already installed; skipping base panel install.")
     else:
-        install_panel_stub()
+        print()
+        print("Pterodactyl panel directory not found.")
+        print("PHP 8.3 and dependencies have been installed (if apt was available).")
+        print("Finish the panel install by following:")
+        print("  https://docs.pterodactyl.io/v1/panel/getting-started")
+        print(f"When configuring the web server, listen on port {PANEL_PORT} (not 80/443).")
+        print("Then re-run this script with the same flag for egg/yolk guidance only.")
 
+    configure_webserver_port(detect_webserver())
     print_egg_instructions(mode)
     print_port_forward_instructions()
 

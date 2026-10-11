@@ -14,7 +14,7 @@ maintains an nginx or Angie stream reverse-proxy configuration.
   - `--static IP` — one-time conf generation and reload; rejects addresses that
     end with a known dynamic-DNS suffix (see `DYNAMIC_DNS_HOSTS`)
 - `install-on-target-only/install-pterodactyl-instead.py` — optional Pterodactyl
-  setup for the private server. Requires `--latest` or `--blightfall`.
+  setup for the private server. Requires `--vanilla` or `--blightfall`.
   Uses atypical panel port 8443. After it runs, the public proxy installer
   must be re-run with `--pterodactyl` so port 443 on the proxy forwards to it.
 

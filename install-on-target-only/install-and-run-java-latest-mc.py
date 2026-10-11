@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Install and run the latest vanilla Minecraft server.
+"""Install latest Java (if needed) and run the vanilla Minecraft server.
 
-Places files in /opt/minecraft/latest.
+Places files in /opt/minecraft/vanilla.
 Records the install in /opt/minecraft/nomcproxy.list,
 copies server.md, and creates an XDG desktop shortcut to the repo root.
 
 Intended for the private/home server only. Do not run nomcproxy here.
+Uses latest Java (OpenJDK 21+), not Java 8.
 """
 
 from __future__ import annotations
@@ -24,11 +25,11 @@ REPO_DIR = os.path.dirname(TARGET_SCRIPTS_DIR)
 sys.path.insert(0, REPO_DIR)
 
 INSTALL_ROOT = Path("/opt/minecraft")
-SERVER_DIR = INSTALL_ROOT / "latest"
+SERVER_DIR = INSTALL_ROOT / "vanilla"
 LIST_FILE = INSTALL_ROOT / "nomcproxy.list"
 SERVER_MD_SRC = Path(TARGET_SCRIPTS_DIR) / "server.md"
 SERVER_MD_DST = INSTALL_ROOT / "server.md"
-ENTRY_NAME = "latest"
+ENTRY_NAME = "vanilla"
 
 MANIFEST_URL = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"
 
@@ -37,7 +38,7 @@ def ensure_java() -> str:
     java = shutil.which("java")
     if java:
         return java
-    print("Java not found. Attempting to install OpenJDK...")
+    print("Latest Java not found. Attempting to install OpenJDK 21...")
     if shutil.which("apt-get"):
         subprocess.run(["sudo", "apt-get", "update"], check=True)
         subprocess.run(

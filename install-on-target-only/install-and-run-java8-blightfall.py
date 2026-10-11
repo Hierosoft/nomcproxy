@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Install and run the Blightfall (1.7.10) server.
+"""Install Java 8 (Amazon Corretto) if needed and run the Blightfall (1.7.10) server.
 
 Places files in /opt/minecraft/1.7.10-blightfall.
 Records the install in /opt/minecraft/nomcproxy.list,

@@ -110,8 +110,8 @@ The VPS reverse-proxies the connection to your home server; players never see th
 Scripts in `install-on-target-only/` are meant to be copied to and run on the home server only.
 They are Python and detect the repository root automatically.
 
-- `install-and-run-java-latest-mc.py` — installs a recent Java if needed, downloads the official latest vanilla server jar into `/opt/minecraft/latest`, accepts the EULA, and starts it.
-- `install-and-run-java8-blightfall.py` — installs Amazon Corretto 8 if needed, downloads the Blightfall server pack into `/opt/minecraft/1.7.10-blightfall`, and starts it.
+- `install-and-run-java-latest-mc.py` — installs latest Java (OpenJDK 21+) if needed, downloads the official current vanilla server jar into `/opt/minecraft/vanilla`, accepts the EULA, and starts it.
+- `install-and-run-java8-blightfall.py` — installs Java 8 (Amazon Corretto 8) if needed, downloads the Blightfall server pack into `/opt/minecraft/1.7.10-blightfall`, and starts it.
 
 Both scripts also:
 - Append the install name to `/opt/minecraft/nomcproxy.list` (no duplicates)
@@ -123,10 +123,10 @@ Both scripts also:
 cd /path/to/nomcproxy/install-on-target-only
 chmod +x install-and-run-java-latest-mc.py install-and-run-java8-blightfall.py
 
-# Vanilla
+# Vanilla (latest Java)
 ./install-and-run-java-latest-mc.py
 
-# or Blightfall
+# or Blightfall (Java 8)
 ./install-and-run-java8-blightfall.py
 ```
 
@@ -138,12 +138,12 @@ Instead of a plain jar you can run Pterodactyl on the home machine:
 
 ```bash
 # on the home server
-sudo python3 install-on-target-only/install-pterodactyl-instead.py --latest
+sudo python3 install-on-target-only/install-pterodactyl-instead.py --vanilla
 # or
 sudo python3 install-on-target-only/install-pterodactyl-instead.py --blightfall
 ```
 
-The script requires `--latest` or `--blightfall`, configures (or documents)
+The script requires `--vanilla` or `--blightfall`, configures (or documents)
 the panel on atypical port 8443, and prints egg/yolk steps plus the router
 ports to forward. Then on the public proxy re-run `install.py` with
 `--pterodactyl` so the panel is available on normal port 443 via the same
