@@ -31,21 +31,22 @@ CRON_USER = "root"
 MAIN_MODULE = "nomcproxy.py"
 
 
-def die(msg: str, code: int = 1) -> None:
-    print(f"Error: {msg}", file=sys.stderr)
-    sys.exit(code)
+def echo0(*args, **kwargs) -> None:
+    kwargs['file'] = sys.stderr
+    print(*args, **kwargs)
 
 
-def install_cron(hostname: str) -> None:
+def install_cron(hostname: str) -> int:
     here = Path(__file__).resolve().parent
     main_script = here / MAIN_MODULE
 
     if not main_script.is_file():
-        die(f"{MAIN_MODULE} not found next to installer ({main_script})")
+        echo0(f"Error: {MAIN_MODULE} not found next to installer ({main_script})")
+        return 1
 
     mode = main_script.stat().st_mode
     if not (mode & stat.S_IXUSR):
-        print(f"Warning: {main_script} is not marked executable", file=sys.stderr)
+        echo0(f"Warning: {main_script} is not marked executable")
 
     abs_script = main_script.resolve()
 
@@ -63,16 +64,19 @@ PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
         os.chown(CRON_FILE, 0, 0)
         os.chmod(CRON_FILE, 0o644)
     except OSError as e:
-        die(f"failed to write {CRON_FILE}: {e}")
+        echo0(f"Error: failed to write {CRON_FILE}: {e}")
+        return 1
 
     print(f"Installed cron job: {CRON_FILE}")
     print(f"  runs: {CRON_SCHEDULE} as {CRON_USER}")
     print(f"  command: {abs_script} --dynamic {hostname}")
+    return 0
 
 
-def main() -> None:
+def main() -> int:
     if os.geteuid() != 0:
-        die("must be run as root")
+        echo0("Error: must be run as root")
+        return 1
 
     parser = argparse.ArgumentParser(description="Install nomcproxy configuration")
     group = parser.add_mutually_exclusive_group(required=True)
@@ -82,23 +86,34 @@ def main() -> None:
 
     if args.static:
         if nomcproxy.is_dynamic_address(args.static):
-            die(f"--static cannot be used with a dynamic-DNS hostname: {args.static}")
+            echo0(f"Error: --static cannot be used with a dynamic-DNS hostname: {args.static}")
+            return 1
         try:
             nomcproxy.apply_static(args.static)
             print(f"Static configuration applied for {args.static}")
         except Exception as e:
-            die(str(e))
-    else:
-        if not nomcproxy.is_wan_hostname(args.dynamic):
-            die(f"--dynamic requires a WAN hostname, got: {args.dynamic!r}")
-        install_cron(args.dynamic)
-        # Also do an immediate update so the conf exists right away
-        try:
-            nomcproxy.update_dynamic(args.dynamic)
-            print("Initial dynamic update completed")
-        except Exception as e:
-            die(f"Initial update failed: {e}")
+            echo0(f"Error: {e}")
+            return 1
+        return 0
+
+    if not nomcproxy.is_wan_hostname(args.dynamic):
+        echo0(f"Error: --dynamic requires a WAN hostname, got: {args.dynamic!r}")
+        return 1
+
+    rc = install_cron(args.dynamic)
+    if rc != 0:
+        return rc
+
+    # Also do an immediate update so the conf exists right away
+    try:
+        nomcproxy.update_dynamic(args.dynamic)
+        print("Initial dynamic update completed")
+    except Exception as e:
+        echo0(f"Error: Initial update failed: {e}")
+        return 1
+
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
