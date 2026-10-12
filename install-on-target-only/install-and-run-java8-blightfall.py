@@ -175,6 +175,10 @@ def main() -> None:
     write_desktop_shortcut()
 
     print(f"Starting Blightfall with {jar}")
+    nomcproxy.print_firewall_instructions(
+        [(25565, "tcp", "Minecraft (Java uses TCP)")],
+        behind_router=True,
+    )
     os.chdir(SERVER_DIR)
     os.execvp(
         java,

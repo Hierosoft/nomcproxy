@@ -621,3 +621,19 @@ If there is some similar/same structure in nginx instruct the user about that if
 Uncomment the section automatically, or add it if missing. At the end of setup, warn if any files are in stream.d other than the one we wrote.
 
 We can't put the acme client definition in both files. If it is ok in the file in http.d just do it there and don't instruct to put it in the other file. Also, the correct directive within the server block is acme, not acme_certificate when using angie.
+
+- 2026-10-11
+
+In the target scripts and proxy script, detect if any firewall service is running and provide instructions at the end to allow the appropriate ports (and forward in the case of the target, since that is typically a PC behind a router).
+
+There is no acme setup on the target. Do we need that? If so, require a --secret-host option and set it up (same name sanitization as for proxy if an acme client definition is necessary). I'd like to be able to access the server not-by-proxy using the dynamic host, unless not possible to enable https to work using the static proxy domain (if possible, setup 2 acme clients or do whatever we need to do). Explain what is possible and necessary before proceeding with the proxy https plan.
+
+Lets refine and simplify the plan to have proxy-only https before proceeding.
+
+Confirmed.
+
+The include of stream.d is in a stream block already, so we mustn't explicitly say stream in the proxy stream conf file.
+
+Provide instructions for router (in front of server) and detected software firewall (on proxy) even if all of the setup steps are detected as complete. Be sure to specify UDP and/or TCP as necessary. If detected software firewall has a way to easily check if the steps are done, show which steps are done and which are not. If it has that and also has a way to complete the steps automatically, complete them automatically, validate the result, and state which steps are already complete.
+
+Also show (and do if possible) any necessary steps similarly on the server, if it has a firewall service running. In the cases of both server and proxy, if there is no software firewall service running, say so instead of saying any inapplicable steps or saying nothing.

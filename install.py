@@ -122,6 +122,12 @@ def main() -> int:
             print(f"  {path}")
         print("Those are also loaded by the stream include.")
 
+    ports = [(nomcproxy.LISTEN_PORT, "tcp", "Minecraft (Java uses TCP; UDP is not proxied)")]
+    if args.pterodactyl:
+        ports.append((80, "tcp", "ACME http-01 challenge"))
+        ports.append((nomcproxy.PTERODACTYL_PROXY_PORT, "tcp", "Pterodactyl panel (HTTPS)"))
+    nomcproxy.print_firewall_instructions(ports, behind_router=False)
+
     return 0
 
 

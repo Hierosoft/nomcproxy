@@ -146,6 +146,10 @@ def main() -> None:
     write_desktop_shortcut()
 
     print(f"Starting vanilla Minecraft server in {SERVER_DIR}")
+    nomcproxy.print_firewall_instructions(
+        [(25565, "tcp", "Minecraft (Java uses TCP)")],
+        behind_router=True,
+    )
     os.chdir(SERVER_DIR)
     os.execvp(java, [java, "-Xms2G", "-Xmx4G", "-jar", str(jar), "nogui"])
 

@@ -194,14 +194,118 @@ def is_service_active(service: str) -> bool:
         return False
 
 
-def minecraft_conf_dir(service: str) -> Path:
-    """Stream include dir. Minecraft is TCP and cannot live in http.d."""
-    if service == "angie":
-        return Path("/etc/angie/stream.d")
-    stream_d = Path("/etc/nginx/stream.d")
-    if stream_d.is_dir():
-        return stream_d
-    return Path("/etc/nginx/conf.d")
+def detect_firewall() -> str | None:
+    """Return the name of a running firewall service, or None."""
+    for name in ("ufw", "firewalld", "nftables"):
+        if is_service_active(name):
+            return name
+    return None
+
+
+def _port_open_ufw(port: int, proto: str) -> bool:
+    r = subprocess.run(["ufw", "status"], capture_output=True, text=True)
+    if r.returncode != 0:
+        return False
+    needle = f"{port}/{proto}"
+    for line in r.stdout.splitlines():
+        if needle in line and "ALLOW" in line.upper():
+            return True
+    return False
+
+
+def _port_open_firewalld(port: int, proto: str) -> bool:
+    r = subprocess.run(
+        ["firewall-cmd", f"--query-port={port}/{proto}"],
+        capture_output=True,
+        text=True,
+    )
+    return r.returncode == 0 and r.stdout.strip() == "yes"
+
+
+def ensure_firewall_ports(ports: list[tuple[int, str, str]]) -> list[tuple[int, str, str, str]]:
+    """Check and, for ufw/firewalld, open missing ports. Return (port, proto, desc, status).
+
+    status is already-open, opened, failed, or manual.
+    """
+    fw = detect_firewall()
+    results: list[tuple[int, str, str, str]] = []
+    if fw not in ("ufw", "firewalld"):
+        return [(port, proto, desc, "manual") for port, proto, desc in ports]
+
+    changed = False
+    for port, proto, desc in ports:
+        open_now = _port_open_ufw(port, proto) if fw == "ufw" else _port_open_firewalld(port, proto)
+        if open_now:
+            results.append((port, proto, desc, "already-open"))
+            continue
+        if fw == "ufw":
+            r = subprocess.run(["ufw", "allow", f"{port}/{proto}"], capture_output=True, text=True)
+        else:
+            r = subprocess.run(
+                ["firewall-cmd", "--permanent", f"--add-port={port}/{proto}"],
+                capture_output=True,
+                text=True,
+            )
+            changed = True
+        if r.returncode != 0:
+            results.append((port, proto, desc, "failed"))
+            continue
+        results.append((port, proto, desc, "opened"))
+
+    if fw == "firewalld" and changed:
+        subprocess.run(["firewall-cmd", "--reload"], capture_output=True, text=True)
+
+    validated: list[tuple[int, str, str, str]] = []
+    for port, proto, desc, status in results:
+        if status != "opened":
+            validated.append((port, proto, desc, status))
+            continue
+        ok = _port_open_ufw(port, proto) if fw == "ufw" else _port_open_firewalld(port, proto)
+        validated.append((port, proto, desc, "opened" if ok else "failed"))
+    return validated
+
+
+def print_firewall_instructions(
+    ports: list[tuple[int, str, str]],
+    *,
+    behind_router: bool,
+) -> None:
+    """Always print firewall status and, on the home server, router forwards.
+
+    ports is (port, proto, description). proto is tcp or udp.
+    ufw and firewalld are checked, missing rules are added, then rechecked.
+    """
+    fw = detect_firewall()
+    where = "private server" if behind_router else "proxy"
+    print()
+    print("=" * 60)
+    print(f"Software firewall on this {where}")
+    print("=" * 60)
+    if not fw:
+        print("No software firewall service is running on this machine.")
+        print("Checked ufw, firewalld, and nftables. No firewall rules to add.")
+    else:
+        print(f"Detected running firewall: {fw}")
+        print()
+        print("Required inbound ports:")
+        for port, proto, desc in ports:
+            print(f"  {port}/{proto}   {desc}")
+        print()
+        if fw in ("ufw", "firewalld"):
+            print(f"{fw}: checked, applied any missing rules, then rechecked.")
+            for port, proto, desc, status in ensure_firewall_ports(ports):
+                print(f"  {status:13} {port}/{proto}   {desc}")
+        else:
+            print("nftables has no safe generic check/apply here.")
+            print("Add accept rules for the ports above, then reload nftables.")
+    if behind_router:
+        print()
+        print("Router in front of this private server:")
+        print("Forward these ports to this machine's LAN IP.")
+        print("Do not give players this machine's public IP or dynamic hostname.")
+        for port, proto, desc in ports:
+            print(f"  {port}/{proto}   {desc}")
+    print("=" * 60)
 
 
 def minecraft_conf_dir(service: str) -> Path:
@@ -305,7 +409,7 @@ def make_minecraft_conf(upstream: str, dynamic: bool, comment: str = "") -> str:
         proxy_connect_timeout 5s;
     }}
 """
-    return f"{header}stream {{\n{body}}}\n"
+    return f"{header}{body}"
 
 
 def panel_conf_dir(service: str) -> Path:

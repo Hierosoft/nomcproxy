@@ -1029,6 +1029,15 @@ def main() -> int:
 
         print_egg_instructions(mode)
         print_port_forward_instructions()
+        nomcproxy.print_firewall_instructions(
+            [
+                (PANEL_PORT, "tcp", "Pterodactyl panel"),
+                (MINECRAFT_PORT, "tcp", "Minecraft (Java uses TCP)"),
+                (WINGS_API_PORT, "tcp", "Wings API"),
+                (WINGS_SFTP_PORT, "tcp", "Wings SFTP"),
+            ],
+            behind_router=True,
+        )
 
         print()
         print("=" * 60)
