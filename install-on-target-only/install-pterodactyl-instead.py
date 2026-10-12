@@ -19,10 +19,14 @@ If Pterodactyl is already installed, only egg/yolk guidance is performed.
 from __future__ import annotations
 
 import argparse
+import json
 import os
+import secrets
 import shutil
 import subprocess
 import sys
+import urllib.request
+from collections import OrderedDict
 from pathlib import Path
 
 TARGET_SCRIPTS_DIR = os.path.dirname(os.path.realpath(__file__))
@@ -37,7 +41,9 @@ WINGS_API_PORT = 8080
 WINGS_SFTP_PORT = 2022
 
 PANEL_DIR = Path("/var/www/pterodactyl")
-PHP_FPM_SERVICE = "php8.3-fpm"
+CREDENTIALS_FILE = Path("/root/nomcproxy-pterodactyl-credentials.json")
+PANEL_TARBALL_URL = "https://github.com/pterodactyl/panel/releases/latest/download/panel.tar.gz"
+PHP_BIN = "php8.3"
 PHP_FPM_SOCK = "/run/php/php8.3-fpm.sock"
 
 # Packages from https://docs.pterodactyl.io/v1/panel/getting-started
@@ -300,7 +306,556 @@ def print_egg_instructions(mode: str) -> None:
         print("first login; that step is left manual so you can verify the import.")
 
 
-def configure_webserver_port(webserver: str) -> None:
+def run(cmd: list[str], cwd: Path | None = None, env: dict | None = None) -> int:
+    """Run a command. Return its exit code (non-zero is a failure for the caller)."""
+    print(f"Running: {' '.join(cmd)}")
+    r = subprocess.run(cmd, cwd=cwd, env=env)
+    if r.returncode != 0:
+        echo0(f"Error: {' '.join(cmd)} failed with exit code {r.returncode}")
+    return r.returncode
+
+
+class ServerInstallState:
+    """Credentials as OrderedDict (operation) of OrderedDicts (credential fields).
+
+    JSON file is only replaced after a successful load (if it existed at start)
+    and a successful write of a temp file, then rename.
+    Passwords are stored only after the matching system call is validated.
+    """
+
+    def __init__(self, path: Path = CREDENTIALS_FILE) -> None:
+        self.path = path
+        self.ops: OrderedDict[str, OrderedDict[str, str]] = OrderedDict()
+        self.webserver: str | None = None
+        self.file_existed_at_start = False
+        self.loaded_ok = False
+
+    def load(self) -> int:
+        self.file_existed_at_start = self.path.is_file()
+        if not self.file_existed_at_start:
+            self.loaded_ok = True
+            return 0
+        try:
+            text = self.path.read_text()
+            raw = json.loads(text, object_pairs_hook=OrderedDict)
+            if not isinstance(raw, OrderedDict):
+                raise ValueError("credentials root is not an object")
+            ops: OrderedDict[str, OrderedDict[str, str]] = OrderedDict()
+            for name, fields in raw.items():
+                if not isinstance(fields, OrderedDict):
+                    raise ValueError(f"operation {name!r} is not an object")
+                ops[name] = fields
+            self.ops = ops
+            self.loaded_ok = True
+            print(f"Loaded credentials from {self.path}")
+            return 0
+        except (OSError, json.JSONDecodeError, ValueError) as e:
+            self.loaded_ok = False
+            echo0(f"Error: refusing to continue; could not load {self.path}: {e}")
+            return 1
+
+    def get(self, operation: str, field: str) -> str | None:
+        op = self.ops.get(operation)
+        if op is None:
+            return None
+        return op.get(field)
+
+    def set_field(self, operation: str, field: str, value: str) -> None:
+        if operation not in self.ops:
+            self.ops[operation] = OrderedDict()
+        self.ops[operation][field] = value
+
+    def has_password(self, operation: str) -> bool:
+        return bool(self.get(operation, "password"))
+
+    def can_save(self) -> bool:
+        if self.file_existed_at_start and not self.loaded_ok:
+            return False
+        return True
+
+    def save(self) -> int:
+        """Atomically replace the JSON file. Never overwrite a file we failed to load."""
+        if not self.can_save():
+            echo0(f"Error: not saving {self.path}; existing file was not loaded successfully")
+            return 1
+        if not self.ops:
+            return 0
+        tmp = self.path.with_suffix(".json.tmp")
+        try:
+            tmp.write_text(json.dumps(self.ops, indent=2) + "\n")
+            tmp.chmod(0o600)
+        except OSError as e:
+            echo0(f"Error: failed to write temp credentials {tmp}: {e}")
+            return 1
+        try:
+            if self.path.exists():
+                self.path.unlink()
+            tmp.rename(self.path)
+        except OSError as e:
+            echo0(f"Error: failed to replace {self.path}: {e}")
+            return 1
+        print(f"Saved credentials to {self.path}")
+        return 0
+
+    def print_credentials(self) -> None:
+        """Print stored passwords immediately before exit."""
+        if not any(self.has_password(name) for name in self.ops):
+            return
+        print()
+        print("=" * 60)
+        print("CREDENTIALS (save these now)")
+        print("=" * 60)
+        for name, fields in self.ops.items():
+            print(f"  [{name}]")
+            for key, value in fields.items():
+                print(f"    {key}: {value}")
+        print(f"  file: {self.path}")
+        print("=" * 60)
+
+
+def gen_password(length: int = 24) -> str:
+    alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    return "".join(secrets.choice(alphabet) for _ in range(length))
+
+
+def install_composer() -> int:
+    if shutil.which("composer"):
+        print("composer already installed")
+        return 0
+    if not shutil.which(PHP_BIN):
+        echo0(f"Error: {PHP_BIN} not found (default php is left unchanged)")
+        return 1
+    print("Installing Composer with php8.3...")
+    r = subprocess.run(
+        f"curl -sS https://getcomposer.org/installer | {PHP_BIN} -- --install-dir=/usr/local/bin --filename=composer",
+        shell=True,
+    )
+    if r.returncode != 0:
+        echo0("Error: composer install failed")
+        return r.returncode
+    return 0
+
+
+def download_panel() -> int:
+    if pterodactyl_installed():
+        print("Panel already present; skipping download")
+        return 0
+    PANEL_DIR.mkdir(parents=True, exist_ok=True)
+    tarball = PANEL_DIR / "panel.tar.gz"
+    print(f"Downloading panel from {PANEL_TARBALL_URL}")
+    try:
+        urllib.request.urlretrieve(PANEL_TARBALL_URL, tarball)
+    except Exception as e:
+        echo0(f"Error: failed to download panel: {e}")
+        return 1
+    rc = run(["tar", "-xzf", str(tarball), "-C", str(PANEL_DIR)])
+    tarball.unlink(missing_ok=True)
+    if rc != 0:
+        return rc
+    if not (PANEL_DIR / "artisan").is_file():
+        echo0("Error: panel archive did not contain artisan")
+        return 1
+    return 0
+
+
+def set_panel_permissions() -> int:
+    rc = run(["chmod", "-R", "755", str(PANEL_DIR / "storage"), str(PANEL_DIR / "bootstrap" / "cache")])
+    if rc != 0:
+        return rc
+    return run(["chown", "-R", "www-data:www-data", str(PANEL_DIR)])
+
+
+def db_password_works(password: str) -> bool:
+    """Validate the pterodactyl DB user can connect with this password."""
+    env = os.environ.copy()
+    env["MYSQL_PWD"] = password
+    for client in ("mariadb", "mysql"):
+        if not shutil.which(client):
+            continue
+        r = subprocess.run(
+            [client, "-u", "pterodactyl", "-h", "127.0.0.1", "-e", "SELECT 1", "panel"],
+            env=env,
+            capture_output=True,
+        )
+        if r.returncode == 0:
+            return True
+    return False
+
+
+def admin_user_exists() -> bool:
+    """True if the panel users table already has username admin."""
+    env_file = PANEL_DIR / ".env"
+    if not env_file.is_file():
+        return False
+    password = None
+    for line in env_file.read_text().splitlines():
+        if line.startswith("DB_PASSWORD="):
+            password = line.split("=", 1)[1]
+            break
+    if not password:
+        return False
+    env = os.environ.copy()
+    env["MYSQL_PWD"] = password
+    for client in ("mariadb", "mysql"):
+        if not shutil.which(client):
+            continue
+        r = subprocess.run(
+            [
+                client, "-u", "pterodactyl", "-h", "127.0.0.1",
+                "-N", "-e", "SELECT 1 FROM users WHERE username='admin' LIMIT 1",
+                "panel",
+            ],
+            env=env,
+            capture_output=True,
+            text=True,
+        )
+        if r.returncode == 0 and r.stdout.strip() == "1":
+            return True
+    return False
+
+
+def app_key_present() -> bool:
+    env_file = PANEL_DIR / ".env"
+    if not env_file.is_file():
+        return False
+    for line in env_file.read_text().splitlines():
+        if line.startswith("APP_KEY=") and line.split("=", 1)[1].startswith("base64:"):
+            return True
+    return False
+
+
+def migrations_present() -> bool:
+    env_file = PANEL_DIR / ".env"
+    if not env_file.is_file():
+        return False
+    password = None
+    for line in env_file.read_text().splitlines():
+        if line.startswith("DB_PASSWORD="):
+            password = line.split("=", 1)[1]
+            break
+    if not password:
+        return False
+    env = os.environ.copy()
+    env["MYSQL_PWD"] = password
+    for client in ("mariadb", "mysql"):
+        if not shutil.which(client):
+            continue
+        r = subprocess.run(
+            [
+                client, "-u", "pterodactyl", "-h", "127.0.0.1",
+                "-N", "-e", "SELECT COUNT(*) FROM migrations",
+                "panel",
+            ],
+            env=env,
+            capture_output=True,
+            text=True,
+        )
+        if r.returncode == 0 and r.stdout.strip().isdigit() and int(r.stdout.strip()) > 0:
+            return True
+    return False
+
+
+def cron_present() -> bool:
+    existing = subprocess.run(["crontab", "-l"], capture_output=True, text=True)
+    if existing.returncode != 0:
+        return False
+    return "pterodactyl/artisan schedule:run" in existing.stdout
+
+
+def warn_skip(step: str) -> None:
+    print(f"Warning: {step} already done; skipping")
+
+
+def setup_database(state: ServerInstallState) -> int:
+    """Create the panel database and user, or reuse a validated password."""
+    stored = state.get("database", "password")
+    if stored and db_password_works(stored):
+        warn_skip("database user (stored password validates)")
+        return 0
+    if stored and not db_password_works(stored):
+        echo0("Error: stored database password does not authenticate; not generating a new one")
+        return 1
+    password = gen_password()
+    sql = (
+        "CREATE DATABASE IF NOT EXISTS panel;\n"
+        f"CREATE USER IF NOT EXISTS 'pterodactyl'@'127.0.0.1' IDENTIFIED BY '{password}';\n"
+        f"ALTER USER 'pterodactyl'@'127.0.0.1' IDENTIFIED BY '{password}';\n"
+        "GRANT ALL PRIVILEGES ON panel.* TO 'pterodactyl'@'127.0.0.1' WITH GRANT OPTION;\n"
+        "FLUSH PRIVILEGES;\n"
+    )
+    r = subprocess.run(["mariadb", "-u", "root"], input=sql, text=True)
+    if r.returncode != 0:
+        r = subprocess.run(["mysql", "-u", "root"], input=sql, text=True)
+    if r.returncode != 0:
+        echo0("Error: could not create panel database (mariadb/mysql root via socket)")
+        return r.returncode
+    if not db_password_works(password):
+        echo0("Error: database user was created but the password did not validate")
+        return 1
+    state.set_field("database", "username", "pterodactyl")
+    state.set_field("database", "database", "panel")
+    state.set_field("database", "host", "127.0.0.1")
+    state.set_field("database", "password", password)
+    return state.save()
+
+
+def write_env(db_password: str) -> int:
+    env_example = PANEL_DIR / ".env.example"
+    env_file = PANEL_DIR / ".env"
+    if not env_example.is_file():
+        echo0(f"Error: {env_example} missing")
+        return 1
+    if not env_file.is_file():
+        shutil.copy(env_example, env_file)
+    text = env_file.read_text()
+    replacements = {
+        "APP_URL": f"http://127.0.0.1:{PANEL_PORT}",
+        "APP_TIMEZONE": "UTC",
+        "CACHE_DRIVER": "redis",
+        "SESSION_DRIVER": "redis",
+        "QUEUE_CONNECTION": "redis",
+        "DB_HOST": "127.0.0.1",
+        "DB_PORT": "3306",
+        "DB_DATABASE": "panel",
+        "DB_USERNAME": "pterodactyl",
+        "DB_PASSWORD": db_password,
+        "REDIS_HOST": "127.0.0.1",
+        "REDIS_PORT": "6379",
+    }
+    lines = []
+    seen = set()
+    for line in text.splitlines():
+        key = line.split("=", 1)[0] if "=" in line and not line.startswith("#") else None
+        if key in replacements:
+            lines.append(f"{key}={replacements[key]}")
+            seen.add(key)
+        else:
+            lines.append(line)
+    for key, value in replacements.items():
+        if key not in seen:
+            lines.append(f"{key}={value}")
+    env_file.write_text("\n".join(lines) + "\n")
+    return 0
+
+
+def composer_install_and_key() -> int:
+    env = os.environ.copy()
+    env["COMPOSER_ALLOW_SUPERUSER"] = "1"
+    rc = run(
+        ["composer", "install", "--no-dev", "--optimize-autoloader", "--no-interaction"],
+        cwd=PANEL_DIR,
+        env=env,
+    )
+    if rc != 0:
+        return rc
+    return run([PHP_BIN, "artisan", "key:generate", "--force"], cwd=PANEL_DIR)
+
+
+def migrate_seed() -> int:
+    return run([PHP_BIN, "artisan", "migrate", "--seed", "--force"], cwd=PANEL_DIR)
+
+
+def create_admin(state: ServerInstallState) -> int:
+    if admin_user_exists():
+        if state.has_password("admin"):
+            warn_skip("admin user (already present; using stored password)")
+            return 0
+        echo0("Error: admin user exists but no stored password; not generating a new one")
+        return 1
+    password = state.get("admin", "password") or gen_password()
+    rc = run(
+        [
+            PHP_BIN, "artisan", "p:user:make",
+            "--email=admin@localhost",
+            "--username=admin",
+            "--name-first=Admin",
+            "--name-last=User",
+            f"--password={password}",
+            "--admin=1",
+            "--no-interaction",
+        ],
+        cwd=PANEL_DIR,
+    )
+    if rc != 0:
+        return rc
+    if not admin_user_exists():
+        echo0("Error: admin create reported success but user was not found")
+        return 1
+    state.set_field("admin", "username", "admin")
+    state.set_field("admin", "email", "admin@localhost")
+    state.set_field("admin", "password", password)
+    return state.save()
+
+
+def install_queue_and_cron() -> int:
+    if is_service_active("pteroq") and cron_present():
+        warn_skip("queue worker and cron")
+        return 0
+    if not is_service_active("pteroq"):
+        unit = Path("/etc/systemd/system/pteroq.service")
+        unit.write_text("""[Unit]
+Description=Pterodactyl Queue Worker
+After=redis-server.service
+
+[Service]
+User=www-data
+Group=www-data
+Restart=always
+ExecStart=/usr/bin/php8.3 /var/www/pterodactyl/artisan queue:work --queue=high,standard,low --sleep=3 --tries=3
+StartLimitInterval=180
+StartLimitBurst=30
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
+""")
+        rc = run(["systemctl", "daemon-reload"])
+        if rc != 0:
+            return rc
+        rc = run(["systemctl", "enable", "--now", "redis-server"])
+        if rc != 0:
+            return rc
+        rc = run(["systemctl", "enable", "--now", "pteroq.service"])
+        if rc != 0:
+            return rc
+    else:
+        warn_skip("queue worker")
+    if cron_present():
+        warn_skip("cron")
+        return 0
+    cron_line = "* * * * * /usr/bin/php8.3 /var/www/pterodactyl/artisan schedule:run >> /dev/null 2>&1\n"
+    existing = subprocess.run(["crontab", "-l"], capture_output=True, text=True)
+    current = existing.stdout if existing.returncode == 0 else ""
+    new = current
+    if new and not new.endswith("\n"):
+        new += "\n"
+    new += cron_line
+    r = subprocess.run(["crontab", "-"], input=new, text=True)
+    if r.returncode != 0:
+        echo0("Error: failed to install cron")
+        return r.returncode
+    return 0
+
+
+def write_site_conf(webserver: str) -> int:
+    if webserver == "angie":
+        http_d = Path("/etc/angie/http.d")
+        conf_dir = http_d if http_d.is_dir() else Path("/etc/angie/conf.d")
+    else:
+        conf_dir = Path("/etc/nginx/conf.d")
+    conf_dir.mkdir(parents=True, exist_ok=True)
+    conf_path = conf_dir / "pterodactyl.conf"
+    if conf_path.is_file() and f"listen {PANEL_PORT}" in conf_path.read_text():
+        warn_skip(f"site conf {conf_path}")
+        return 0
+    conf_path.write_text(f"""server {{
+    listen {PANEL_PORT};
+    server_name _;
+    root /var/www/pterodactyl/public;
+    index index.php;
+    client_max_body_size 100m;
+    client_body_timeout 120s;
+    sendfile off;
+
+    location / {{
+        try_files $uri $uri/ /index.php?$query_string;
+    }}
+    location ~ \\.php$ {{
+        fastcgi_split_path_info ^(.+\\.php)(/.+)$;
+        fastcgi_pass unix:{PHP_FPM_SOCK};
+        fastcgi_index index.php;
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_param HTTP_PROXY "";
+    }}
+    location ~ /\\.ht {{
+        deny all;
+    }}
+}}
+""")
+    print(f"Wrote {conf_path}")
+    return run(["systemctl", "reload", webserver])
+
+
+def install_panel(state: ServerInstallState) -> int:
+    """Full getting-started install. Skips steps already done. Returns 0 on success."""
+    if shutil.which("composer"):
+        warn_skip("composer")
+    else:
+        rc = install_composer()
+        if rc != 0:
+            return rc
+
+    if pterodactyl_installed():
+        warn_skip("panel download")
+    else:
+        rc = download_panel()
+        if rc != 0:
+            return rc
+
+    rc = set_panel_permissions()
+    if rc != 0:
+        return rc
+
+    rc = setup_database(state)
+    if rc != 0:
+        return rc
+    db_password = state.get("database", "password")
+    if not db_password:
+        echo0("Error: no validated database password")
+        return 1
+
+    env_file = PANEL_DIR / ".env"
+    if env_file.is_file() and f"DB_PASSWORD={db_password}" in env_file.read_text():
+        warn_skip("environment file")
+    else:
+        rc = write_env(db_password)
+        if rc != 0:
+            return rc
+
+    if (PANEL_DIR / "vendor" / "autoload.php").is_file():
+        warn_skip("composer install")
+    else:
+        env = os.environ.copy()
+        env["COMPOSER_ALLOW_SUPERUSER"] = "1"
+        rc = run(
+            ["composer", "install", "--no-dev", "--optimize-autoloader", "--no-interaction"],
+            cwd=PANEL_DIR,
+            env=env,
+        )
+        if rc != 0:
+            return rc
+
+    if app_key_present():
+        warn_skip("application key")
+    else:
+        rc = run([PHP_BIN, "artisan", "key:generate", "--force"], cwd=PANEL_DIR)
+        if rc != 0:
+            return rc
+        if not app_key_present():
+            echo0("Error: key:generate did not write APP_KEY")
+            return 1
+
+    if migrations_present():
+        warn_skip("migrations")
+    else:
+        rc = migrate_seed()
+        if rc != 0:
+            return rc
+        if not migrations_present():
+            echo0("Error: migrate did not create the migrations table")
+            return 1
+
+    rc = create_admin(state)
+    if rc != 0:
+        return rc
+    rc = install_queue_and_cron()
+    if rc != 0:
+        return rc
+    rc = write_site_conf(state.webserver or "nginx")
+    if rc != 0:
+        return rc
+    return 0
     """Print config using php8.3-fpm for the already-running nginx or angie.
 
     The panel site is an http server block. On Debian 13 Angie the default
@@ -349,56 +904,65 @@ def main() -> int:
     args = parser.parse_args()
 
     mode = "vanilla" if args.vanilla else "blightfall"
+    state = ServerInstallState()
 
-    if os.geteuid() != 0:
-        echo0("Error: must be run as root")
-        return 1
+    try:
+        rc = state.load()
+        if rc != 0:
+            return rc
 
-    refused = refuse_if_proxy()
-    if refused is not None:
-        return refused
+        if os.geteuid() != 0:
+            echo0("Error: must be run as root")
+            return 1
 
-    # Must already have nginx or angie running — never install a web server
-    rc, webserver = require_running_webserver()
-    if rc != 0:
-        return rc
+        refused = refuse_if_proxy()
+        if refused is not None:
+            return refused
 
-    # PHP 8.3 + deps; caller returns early on any real failure
-    rc = install_php_and_deps()
-    if rc != 0:
-        return rc
+        # Must already have nginx or angie running — never install a web server
+        rc, webserver = require_running_webserver()
+        if rc != 0:
+            return rc
+        state.webserver = webserver
 
-    already = pterodactyl_installed()
-    if not already:
-        echo0("Error: Pterodactyl panel is not installed (/var/www/pterodactyl missing).")
-        echo0("PHP 8.3 and dependencies are in place. Finish the panel install:")
-        echo0("  https://docs.pterodactyl.io/v1/panel/getting-started")
-        echo0(f"Bind the site to port {PANEL_PORT} on the running {webserver}, then re-run.")
-        return 1
+        # PHP 8.3 + deps; caller returns early on any real failure
+        rc = install_php_and_deps()
+        if rc != 0:
+            return rc
 
-    print("Pterodactyl panel already installed.")
-    configure_webserver_port(webserver)
-    print_egg_instructions(mode)
-    print_port_forward_instructions()
+        already = pterodactyl_installed()
+        if not already:
+            rc = install_panel(state)
+            if rc != 0:
+                return rc
+        else:
+            print("Pterodactyl panel already installed; skipping base install.")
+            rc = write_site_conf(webserver)
+            if rc != 0:
+                return rc
 
-    print()
-    print("=" * 60)
-    print("Next step on the public proxy")
-    print("=" * 60)
-    print("On the VPS that runs nomcproxy, re-run the installer with --pterodactyl:")
-    print("  sudo python3 install.py --dynamic <your-home-dynamic-hostname> --pterodactyl")
-    print("  # or")
-    print("  sudo python3 install.py --static <home-ip> --pterodactyl")
-    print()
-    print("That makes the proxy listen on the typical HTTPS port and forward")
-    print(f"to this machine's port {PANEL_PORT}. You and players then use only")
-    print("the public proxy domain/IP; the home IP and dynamic hostname stay hidden.")
-    print()
-    print("Access after the proxy is configured:")
-    print(f"  Panel:     https://<public-proxy-domain-or-ip>")
-    print(f"  Minecraft: <public-proxy-domain-or-ip>:{MINECRAFT_PORT}")
+        print_egg_instructions(mode)
+        print_port_forward_instructions()
 
-    return 0
+        print()
+        print("=" * 60)
+        print("Next step on the public proxy")
+        print("=" * 60)
+        print("On the VPS that runs nomcproxy, re-run the installer with --pterodactyl:")
+        print("  sudo python3 install.py --dynamic <your-home-dynamic-hostname> --pterodactyl")
+        print("  # or")
+        print("  sudo python3 install.py --static <home-ip> --pterodactyl")
+        print()
+        print("That makes the proxy listen on the typical HTTPS port and forward")
+        print(f"to this machine's port {PANEL_PORT}. You and players then use only")
+        print("the public proxy domain/IP; the home IP and dynamic hostname stay hidden.")
+        print()
+        print("Access after the proxy is configured:")
+        print(f"  Panel:     https://<public-proxy-domain-or-ip>")
+        print(f"  Minecraft: <public-proxy-domain-or-ip>:{MINECRAFT_PORT}")
+        return 0
+    finally:
+        state.print_credentials()
 
 
 if __name__ == "__main__":
