@@ -103,3 +103,11 @@ Error: Unable to locate package php8.3-zip
 Error: Couldn't find any package by glob 'php8.3-zip'
 Error: package install failed
 ```
+
+- 2026-10-11
+
+Never install nginx, angie, nor apache2, in case the person has a packaged or compiled angie or other. Make sure install halts if neither nginx nor angie is running. Make sure install halts if any of the system commands return non-zero (excluding apt update, which can have non-fatal issues) unless non-zero return is being used as a sanity check and non-zero is ok. Halt if any condition would make setup invalid instead of proceeding.
+
+provide an updated zip
+
+Instead of using sys.exit more than one place (in if __name__ == "__main__") return nonzero from functions where necessary, and when each of the functions now containing exit are called, instead capture the return in the caller and if non-zero, return early with that code as necessary. Logic should flow all the way back to main every time so that functions are modular. Main can also exit early as necessary if it receives non-zero return codes where that would prevent a successful install. Then provide an updated zip.

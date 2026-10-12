@@ -56,7 +56,6 @@ PHP_PACKAGES = [
 ]
 OTHER_PACKAGES = [
     "mariadb-server",
-    "nginx",
     "tar",
     "unzip",
     "git",
@@ -66,6 +65,7 @@ OTHER_PACKAGES = [
     "apt-transport-https",
     "ca-certificates",
     "gnupg",
+    "lsb-release",
 ]
 
 
@@ -98,11 +98,20 @@ def is_service_active(name: str) -> bool:
         return False
 
 
-def detect_webserver() -> str | None:
-    for name in ("angie", "nginx", "apache2"):
-        if is_service_active(name) or shutil.which(name):
-            return name
-    return None
+def require_running_webserver() -> tuple[int, str]:
+    """Return (0, 'angie'|'nginx') if one is running, else (1, '').
+
+    Do not install a web server — the user may have a packaged or
+    compiled Angie (or other) that we must not overwrite.
+    """
+    if is_service_active("angie"):
+        return 0, "angie"
+    if is_service_active("nginx"):
+        return 0, "nginx"
+    echo0("Error: neither angie nor nginx is running.")
+    echo0("Start one of them first. This script will not install a web server")
+    echo0("(you may already have a packaged or compiled Angie).")
+    return 1, ""
 
 
 def pterodactyl_installed() -> bool:
@@ -118,14 +127,19 @@ def apt_cmd() -> str | None:
     return None
 
 
-def run_apt(args: list[str]) -> int:
+def run_apt(args: list[str], allow_nonzero: bool = False) -> int:
+    """Run apt. Return non-zero on failure unless allow_nonzero (apt update)."""
     cmd = apt_cmd()
     if not cmd:
-        echo0("Error: neither apt nor apt-get found; skipping package install")
+        echo0("Error: neither apt nor apt-get found")
         return 1
     full = ["sudo", cmd] + args
     print(f"Running: {' '.join(full)}")
-    return subprocess.run(full).returncode
+    rc = subprocess.run(full).returncode
+    if rc != 0 and not allow_nonzero:
+        echo0(f"Error: {' '.join(full)} failed with exit code {rc}")
+        return rc
+    return 0 if allow_nonzero else rc
 
 
 def php83_available() -> bool:
@@ -165,31 +179,34 @@ def ensure_sury_php_repo() -> int:
         )
         if r.returncode != 0:
             echo0(f"Error: failed to download SURY key: {r.stderr}")
-            return 1
+            return r.returncode
 
     if not list_file.is_file():
         # Codename (trixie, bookworm, ...)
-        codename = subprocess.run(
+        r = subprocess.run(
             ["lsb_release", "-sc"],
             capture_output=True,
             text=True,
-            check=True,
-        ).stdout.strip()
+        )
+        if r.returncode != 0:
+            echo0(f"Error: lsb_release failed: {r.stderr}")
+            return r.returncode
+        codename = r.stdout.strip()
         line = (
             f"deb [signed-by={keyring}] https://packages.sury.org/php/ "
             f"{codename} main\n"
         )
-        subprocess.run(
+        r = subprocess.run(
             ["sudo", "tee", str(list_file)],
             input=line,
             text=True,
-            check=True,
         )
+        if r.returncode != 0:
+            echo0("Error: failed to write SURY sources list")
+            return r.returncode
         print(f"Added SURY PHP repo for {codename}")
 
-    if run_apt(["update"]) != 0:
-        echo0("Error: apt update failed after adding SURY")
-        return 1
+    run_apt(["update"], allow_nonzero=True)
 
     if not php83_available():
         echo0("Error: php8.3 still not available after adding SURY")
@@ -201,33 +218,35 @@ def ensure_sury_php_repo() -> int:
 def install_php_and_deps() -> int:
     """Install PHP 8.3 and Pterodactyl dependencies if apt is available."""
     if not apt_cmd():
-        echo0("apt/apt-get not available; skipping PHP 8.3 and dependency install.")
+        echo0("Error: apt/apt-get not available.")
         echo0("Install the packages listed at")
         echo0("https://docs.pterodactyl.io/v1/panel/getting-started manually.")
         return 1
 
     print("Installing PHP 8.3 and Pterodactyl panel dependencies...")
-    if run_apt(["update"]) != 0:
-        echo0("Error: apt update failed")
-        return 1
+    run_apt(["update"], allow_nonzero=True)
 
     # Debian 13 (and some others) only ship a newer PHP; add SURY for 8.3
     if not php83_available():
-        if ensure_sury_php_repo() != 0:
-            return 1
+        rc = ensure_sury_php_repo()
+        if rc != 0:
+            return rc
 
     packages = PHP_PACKAGES + OTHER_PACKAGES
-    if run_apt(["install", "-y"] + packages) != 0:
-        echo0("Error: package install failed")
-        return 1
+    rc = run_apt(["install", "-y"] + packages)
+    if rc != 0:
+        return rc
 
-    # Start and enable php8.3-fpm
+    # Start and enable php8.3-fpm — must succeed
     print(f"Starting {PHP_FPM_SERVICE}...")
-    subprocess.run(["sudo", "systemctl", "enable", "--now", PHP_FPM_SERVICE], check=False)
-    if is_service_active(PHP_FPM_SERVICE):
-        print(f"{PHP_FPM_SERVICE} is active")
-    else:
-        echo0(f"Warning: {PHP_FPM_SERVICE} did not become active; check systemctl status")
+    r = subprocess.run(["sudo", "systemctl", "enable", "--now", PHP_FPM_SERVICE])
+    if r.returncode != 0:
+        echo0(f"Error: systemctl enable --now {PHP_FPM_SERVICE} failed")
+        return r.returncode
+    if not is_service_active(PHP_FPM_SERVICE):
+        echo0(f"Error: {PHP_FPM_SERVICE} is not active after install")
+        return 1
+    print(f"{PHP_FPM_SERVICE} is active")
     return 0
 
 
@@ -281,16 +300,15 @@ def print_egg_instructions(mode: str) -> None:
         print("first login; that step is left manual so you can verify the import.")
 
 
-def configure_webserver_port(webserver: str | None) -> None:
-    """Print config using php8.3-fpm for nginx/angie."""
+def configure_webserver_port(webserver: str) -> None:
+    """Print config using php8.3-fpm for the already-running nginx or angie."""
     print()
-    print(f"Detected web server: {webserver or 'none'}")
+    print(f"Using web server: {webserver}")
     print(f"Configure the panel site to listen on port {PANEL_PORT} (not 80/443).")
     print(f"PHP-FPM socket: {PHP_FPM_SOCK}")
-    if webserver in ("nginx", "angie"):
-        conf_dir = "/etc/angie/conf.d" if webserver == "angie" else "/etc/nginx/conf.d"
-        print(f"Example ({webserver}) server block for {conf_dir}/pterodactyl.conf:")
-        print(f"""
+    conf_dir = "/etc/angie/conf.d" if webserver == "angie" else "/etc/nginx/conf.d"
+    print(f"Example ({webserver}) server block for {conf_dir}/pterodactyl.conf:")
+    print(f"""
 server {{
     listen {PANEL_PORT};
     server_name _;
@@ -308,13 +326,7 @@ server {{
     }}
 }}
 """)
-        print(f"Ensure {PHP_FPM_SERVICE} is running, then reload {webserver}.")
-    elif webserver == "apache2":
-        print(f"For Apache, set Listen {PANEL_PORT} and a VirtualHost on that port.")
-        print(f"Enable proxy_fcgi and point PHP to {PHP_FPM_SOCK}, then reload apache2.")
-    else:
-        print("Install nginx or apache2, then bind the panel to port", PANEL_PORT)
-        print(f"and pass PHP to {PHP_FPM_SOCK}.")
+    print(f"{PHP_FPM_SERVICE} is required. Reload {webserver} after adding the site.")
 
 
 def main() -> int:
@@ -336,22 +348,26 @@ def main() -> int:
     if refused is not None:
         return refused
 
-    # Always attempt PHP 8.3 + deps when apt is present
-    install_php_and_deps()
+    # Must already have nginx or angie running — never install a web server
+    rc, webserver = require_running_webserver()
+    if rc != 0:
+        return rc
+
+    # PHP 8.3 + deps; caller returns early on any real failure
+    rc = install_php_and_deps()
+    if rc != 0:
+        return rc
 
     already = pterodactyl_installed()
-    if already:
-        print("Pterodactyl panel already installed; skipping base panel install.")
-    else:
-        print()
-        print("Pterodactyl panel directory not found.")
-        print("PHP 8.3 and dependencies have been installed (if apt was available).")
-        print("Finish the panel install by following:")
-        print("  https://docs.pterodactyl.io/v1/panel/getting-started")
-        print(f"When configuring the web server, listen on port {PANEL_PORT} (not 80/443).")
-        print("Then re-run this script with the same flag for egg/yolk guidance only.")
+    if not already:
+        echo0("Error: Pterodactyl panel is not installed (/var/www/pterodactyl missing).")
+        echo0("PHP 8.3 and dependencies are in place. Finish the panel install:")
+        echo0("  https://docs.pterodactyl.io/v1/panel/getting-started")
+        echo0(f"Bind the site to port {PANEL_PORT} on the running {webserver}, then re-run.")
+        return 1
 
-    configure_webserver_port(detect_webserver())
+    print("Pterodactyl panel already installed.")
+    configure_webserver_port(webserver)
     print_egg_instructions(mode)
     print_port_forward_instructions()
 
