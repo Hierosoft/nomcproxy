@@ -240,6 +240,21 @@ def make_conf(ip: str, comment: str = "", include_pterodactyl: bool = False) -> 
     return body
 
 
+def proxy_conf_paths() -> list[Path]:
+    """Paths where the public proxy writes its stream conf."""
+    return [
+        Path("/etc/nginx/conf.d") / CONF_NAME,
+        Path("/etc/angie/conf.d") / CONF_NAME,
+    ]
+
+
+def find_proxy_conf() -> Path | None:
+    for path in proxy_conf_paths():
+        if path.is_file():
+            return path
+    return None
+
+
 def pterodactyl_enabled() -> bool:
     return PTERODACTYL_MARKER.is_file()
 

@@ -28,6 +28,7 @@ from pathlib import Path
 TARGET_SCRIPTS_DIR = os.path.dirname(os.path.realpath(__file__))
 REPO_DIR = os.path.dirname(TARGET_SCRIPTS_DIR)
 sys.path.insert(0, REPO_DIR)
+import nomcproxy
 
 PANEL_PORT = 8443
 PROXY_PORT = 443
@@ -66,6 +67,19 @@ OTHER_PACKAGES = [
     "ca-certificates",
     "gnupg",
 ]
+
+
+def refuse_if_proxy() -> int | None:
+    conf = nomcproxy.find_proxy_conf()
+    if conf is None:
+        return None
+    echo0(f"Error: refusing to install the private server ({conf} exists — this is the public proxy).")
+    echo0()
+    echo0("Correct usage:")
+    echo0("  - Run install-on-target-only/ scripts only on the private (home) server.")
+    echo0("  - Run install.py only on the public proxy (VPS).")
+    echo0("  - Do not install Pterodactyl / Minecraft here if nomcproxy.conf is present.")
+    return 1
 
 
 def echo0(*args, **kwargs) -> None:
@@ -242,6 +256,10 @@ def main() -> int:
     if os.geteuid() != 0:
         echo0("Error: must be run as root")
         return 1
+
+    refused = refuse_if_proxy()
+    if refused is not None:
+        return refused
 
     # Always attempt PHP 8.3 + deps when apt is present
     install_php_and_deps()

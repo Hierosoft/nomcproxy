@@ -25,6 +25,23 @@ from pathlib import Path
 TARGET_SCRIPTS_DIR = os.path.dirname(os.path.realpath(__file__))
 REPO_DIR = os.path.dirname(TARGET_SCRIPTS_DIR)
 sys.path.insert(0, REPO_DIR)
+import nomcproxy
+
+
+def refuse_if_proxy() -> None:
+    conf = nomcproxy.find_proxy_conf()
+    if conf is None:
+        return
+    print(
+        f"Error: refusing to install the private server ({conf} exists — this is the public proxy).",
+        file=sys.stderr,
+    )
+    print(file=sys.stderr)
+    print("Correct usage:", file=sys.stderr)
+    print("  - Run install-on-target-only/ scripts only on the private (home) server.", file=sys.stderr)
+    print("  - Run install.py only on the public proxy (VPS).", file=sys.stderr)
+    print("  - Do not install Minecraft here if nomcproxy.conf is present.", file=sys.stderr)
+    sys.exit(1)
 
 INSTALL_ROOT = Path("/opt/minecraft")
 SERVER_DIR = INSTALL_ROOT / "1.7.10-blightfall"
@@ -145,6 +162,7 @@ Categories=Development;
 
 
 def main() -> None:
+    refuse_if_proxy()
     java = ensure_corretto()
     SERVER_DIR.mkdir(parents=True, exist_ok=True)
     download_blightfall(SERVER_DIR)

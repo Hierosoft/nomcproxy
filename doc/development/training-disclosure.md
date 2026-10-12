@@ -65,3 +65,13 @@ For the private server add a install-pterodactyl-instead.py script to install pt
 Capitalize H in hierosoft in github URLs. Change "latest" to "vanilla" in args, folder names, and documentation. Improve the install pterodactyl instead script to actually run apt update and install php8.3 (that version is required specifically, so update angie and nginx instructions with regard to php-8.3-fpm) and start the php8.3-fpm service or whatever the service is called on debian. Only actually perform the steps if the apt or at least apt-get command is available via shutil.which (prefer apt). Install the required modules and dependencies as per https://docs.pterodactyl.io/v1/panel/getting-started
 
 The install and run can be still called install-and-run-java-latest-mc.py since it runs the latest java as opposed to the latest vanilla minecraft. Look over the scripts and documentation and use the term latest whenever referring to java versions.
+
+- 2026-10-11
+
+If /opt/minecraft/server.md is detected at the start of proxy install, or angie/nginx conf names are detected at the start of the proxy install, explain the correct usage and refuse to install.
+
+I meant: If /opt/minecraft/server.md is detected at the start of proxy install, or angie/nginx conf names are detected at the start of the server install (any scripts in target folder), explain the correct usage and refuse to install. To clarify further, of course proxy conf names are allowed at start of proxy install, and server conf(s) are allowed at start of server install, but all scripts should detect the opposing confs and refuse to continue.
+
+The canvas keeps going inactive then reviving workspaces if I go to Preview then back to canvas, even if I download the files one by one. The problem started today. Also, starting today, if I right-click any folder then click download, it says "Could not download" that folder name, "try again." I can only download one file at a time.
+
+Both symptoms happen in Waterfox and 153.0.8010.52 (Official Build) for Linux Mint (x86_64) starting today and never happened before. Then again I never used Canvas without a project. Nonetheless, if I move this chat to a project, the problem still happens.

@@ -32,6 +32,31 @@ CRON_SCHEDULE = "*/5 * * * *"
 CRON_USER = "root"
 MAIN_MODULE = "nomcproxy.py"
 
+# Marker that this machine is the private/home server, not the public proxy.
+PRIVATE_SERVER_MD = Path("/opt/minecraft/server.md")
+
+
+def explain_and_refuse(reason: str) -> int:
+    echo0(f"Error: refusing to install nomcproxy on this machine ({reason}).")
+    echo0()
+    echo0("Correct usage:")
+    echo0("  - Run this installer (install.py) only on the public proxy (VPS).")
+    echo0("    It hides the home server's IP and dynamic hostname.")
+    echo0("  - Run the scripts in install-on-target-only/ only on the private")
+    echo0("    (home) server. Those install Minecraft / Pterodactyl there.")
+    echo0("  - Do not install the proxy on the machine that hosts the Minecraft")
+    echo0("    world. Players connect to the proxy; the proxy forwards to home.")
+    return 1
+
+
+def check_opposing_markers() -> int | None:
+    """Refuse if private-server markers are present. Proxy confs are allowed."""
+    if PRIVATE_SERVER_MD.is_file():
+        return explain_and_refuse(
+            f"{PRIVATE_SERVER_MD} exists — this is the private server"
+        )
+    return None
+
 
 def echo0(*args, **kwargs) -> None:
     kwargs['file'] = sys.stderr
@@ -79,6 +104,10 @@ def main() -> int:
     if os.geteuid() != 0:
         echo0("Error: must be run as root")
         return 1
+
+    refused = check_opposing_markers()
+    if refused is not None:
+        return refused
 
     parser = argparse.ArgumentParser(description="Install nomcproxy configuration")
     group = parser.add_mutually_exclusive_group(required=True)
