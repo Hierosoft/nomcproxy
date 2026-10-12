@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import secrets
 import shutil
 import subprocess
@@ -87,6 +88,11 @@ def refuse_if_proxy() -> int | None:
     echo0("  - Run install.py only on the public proxy (VPS).")
     echo0("  - Do not install Pterodactyl / Minecraft here if nomcproxy.conf is present.")
     return 1
+
+
+def is_valid_email(value: str) -> bool:
+    """Laravel-compatible enough: must look like a real email, not admin@localhost."""
+    return bool(re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", value))
 
 
 def echo0(*args, **kwargs) -> None:
@@ -698,7 +704,7 @@ def create_admin(state: ServerInstallState) -> int:
     rc = run(
         [
             PHP_BIN, "artisan", "p:user:make",
-            "--email=admin@localhost",
+            f"--email={state.get('admin', 'email')}",
             "--username=admin",
             "--name-first=Admin",
             "--name-last=User",
@@ -714,7 +720,7 @@ def create_admin(state: ServerInstallState) -> int:
         echo0("Error: admin create reported success but user was not found")
         return 1
     state.set_field("admin", "username", "admin")
-    state.set_field("admin", "email", "admin@localhost")
+    state.set_field("admin", "email", state.get("admin", "email") or "")
     state.set_field("admin", "password", password)
     return state.save()
 
@@ -933,15 +939,33 @@ def main() -> int:
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--vanilla", action="store_true", help="Prepare for vanilla Minecraft")
     group.add_argument("--blightfall", action="store_true", help="Prepare for Blightfall (1.7.10)")
+    parser.add_argument(
+        "--admin-email",
+        required=True,
+        metavar="EMAIL",
+        help="Valid email for the panel admin (required; admin@localhost is rejected)",
+    )
     args = parser.parse_args()
 
     mode = "vanilla" if args.vanilla else "blightfall"
+    if not is_valid_email(args.admin_email):
+        echo0(f"Error: --admin-email must be a valid email address, got: {args.admin_email!r}")
+        echo0("Example: sudo python3 install-pterodactyl-instead.py --vanilla --admin-email you@example.com")
+        return 1
+
     state = ServerInstallState()
 
     try:
         rc = state.load()
         if rc != 0:
             return rc
+
+        stored_email = state.get("admin", "email")
+        if stored_email and stored_email != args.admin_email:
+            print(f"Warning: using stored admin email {stored_email} (ignoring --admin-email {args.admin_email})")
+        elif not stored_email:
+            state.set_field("admin", "email", args.admin_email)
+            state.set_field("admin", "username", "admin")
 
         if os.geteuid() != 0:
             echo0("Error: must be run as root")
