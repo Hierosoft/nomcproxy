@@ -44,6 +44,7 @@ PANEL_DIR = Path("/var/www/pterodactyl")
 CREDENTIALS_FILE = Path("/root/nomcproxy-pterodactyl-credentials.json")
 PANEL_TARBALL_URL = "https://github.com/pterodactyl/panel/releases/latest/download/panel.tar.gz"
 PHP_BIN = "php8.3"
+PHP_FPM_SERVICE = "php8.3-fpm"
 PHP_FPM_SOCK = "/run/php/php8.3-fpm.sock"
 
 # Packages from https://docs.pterodactyl.io/v1/panel/getting-started
@@ -148,7 +149,26 @@ def run_apt(args: list[str], allow_nonzero: bool = False) -> int:
     return 0 if allow_nonzero else rc
 
 
-def php83_available() -> bool:
+def pin_sury_php83() -> int:
+    """Prefer SURY php8.3-* over any Debian php-* / php8.4 packages."""
+    pref = Path("/etc/apt/preferences.d/sury-php83")
+    pref.write_text(
+        "Package: php8.3*\n"
+        "Pin: origin packages.sury.org\n"
+        "Pin-Priority: 1001\n"
+    )
+    print(f"Pinned php8.3* to packages.sury.org ({pref})")
+    return 0
+
+
+def php83_from_sury() -> bool:
+    """True if the php8.3 candidate comes from packages.sury.org."""
+    r = subprocess.run(
+        ["apt-cache", "policy", "php8.3"],
+        capture_output=True,
+        text=True,
+    )
+    return r.returncode == 0 and "packages.sury.org" in r.stdout
     """Return True if apt can see the php8.3 package."""
     r = subprocess.run(
         ["apt-cache", "policy", "php8.3"],
@@ -217,7 +237,10 @@ def ensure_sury_php_repo() -> int:
     if not php83_available():
         echo0("Error: php8.3 still not available after adding SURY")
         return 1
-    print("php8.3 is now available")
+    if not php83_from_sury():
+        echo0("Error: php8.3 is available but not from packages.sury.org")
+        return 1
+    print("php8.3 is available from SURY")
     return 0
 
 
@@ -229,19 +252,25 @@ def install_php_and_deps() -> int:
         echo0("https://docs.pterodactyl.io/v1/panel/getting-started manually.")
         return 1
 
-    print("Installing PHP 8.3 and Pterodactyl panel dependencies...")
+    print("Installing SURY php8.3 packages and Pterodactyl panel dependencies...")
     run_apt(["update"], allow_nonzero=True)
 
-    # Debian 13 (and some others) only ship a newer PHP; add SURY for 8.3
-    if not php83_available():
+    # Debian 13 ships php8.4; php8.3 must come from SURY, never bare php-*
+    if not php83_available() or not php83_from_sury():
         rc = ensure_sury_php_repo()
         if rc != 0:
             return rc
+    pin_sury_php83()
 
     packages = PHP_PACKAGES + OTHER_PACKAGES
     rc = run_apt(["install", "-y"] + packages)
     if rc != 0:
         return rc
+
+    # Confirm we got the versioned binary, not the distro default php
+    if not shutil.which(PHP_BIN):
+        echo0(f"Error: {PHP_BIN} binary missing after install (refusing to use default php)")
+        return 1
 
     # Start and enable php8.3-fpm — must succeed
     print(f"Starting {PHP_FPM_SERVICE}...")

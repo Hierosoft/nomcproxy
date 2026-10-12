@@ -168,3 +168,48 @@ Just do all of the steps: https://docs.pterodactyl.io/v1/panel/getting-started
 Make sure you don't change the default php. Use php8.3 explicitly. Make sure all passwords you generate are shown directly before exit (not before), even if setup fails and returns early, so we don't miss them. Make a ServerInstallState class to collect the passwords and make state and usage more clear.
 
 Store the Credentials as OrderedDict (key is is operation name) of OrderedDicts (key is credential type or other info). Make the credentials file json. Save with indent 2. If exists, load using object pairs hook OrderedDict. Only save password if was actually set (if system call seemed to work; but actually validate the result wherever possible). Don't ever overwrite the json file unless it was correctly loaded (if was present at the start of the program) and a tmp file was successfully saved (then you can remove existing if was present, and rename tmp to real name). Detect system state to skip any steps that were already done when running the script again--warn and continue to next step. Re-running should not generate credentials that were generated before. Instead use the ones from json if present.
+
+- 2026-10-11
+
+You are installing php-* packages instead of sury php5.3-* packages. Switch back to using php5.3 explicitly. After the php dep install steps I get:
+```
+Traceback (most recent call last):
+  File
+"/opt/git/nomcproxy/install-on-target-only/./install-pterodactyl-instead.py"
+, line
+969
+, in
+<module>
+
+    sys.exit(
+main
+()
+)
+
+~~~~
+^^
+
+  File
+"/opt/git/nomcproxy/install-on-target-only/./install-pterodactyl-instead.py"
+, line
+929
+, in
+main
+
+    rc = install_php_and_deps()
+  File
+"/opt/git/nomcproxy/install-on-target-only/./install-pterodactyl-instead.py"
+, line
+247
+, in
+install_php_and_deps
+
+    print(f"Starting {
+PHP_FPM_SERVICE
+}...")
+
+^^^^^^^^^^^^^^^
+NameError
+:
+name 'PHP_FPM_SERVICE' is not defined. Did you mean: 'PHP_FPM_SOCK'?
+```
