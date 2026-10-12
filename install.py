@@ -122,9 +122,6 @@ def main() -> int:
             print(f"  {path}")
         print("Those are also loaded by the stream include.")
 
-    if args.pterodactyl and service == "angie":
-        nomcproxy.print_angie_acme_instructions(args.pterodactyl_domain)
-
     return 0
 
 

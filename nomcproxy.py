@@ -335,7 +335,11 @@ acme_client {name}
     renew_before_expiry=30d;
 
 """
-        ssl = f"    acme_certificate {name};\n"
+        ssl = (
+            f"    acme {name};\n"
+            f"    ssl_certificate $acme_cert_{name};\n"
+            f"    ssl_certificate_key $acme_cert_key_{name};\n"
+        )
         logs = (
             f"    access_log /var/log/angie/{name}.log main;\n"
             f"    error_log /var/log/angie/{name}.err info;\n"
@@ -358,7 +362,7 @@ acme_client {name}
     return f"""# Managed by nomcproxy — do not edit by hand
 # role: pterodactyl
 # Panel virtual host. Minecraft is stream.d/{CONF_NAME}.
-# acme_certificate name: {name}
+# acme client: {name}
 {acme}server {{
     listen 80;
     server_name {domain};
@@ -380,29 +384,6 @@ server {{
     }}
 }}
 """
-
-
-def print_angie_acme_instructions(domain: str) -> None:
-    """Tell the operator to define a new acme_client before reload will succeed."""
-    name = acme_client_name(domain)
-    print()
-    print("=" * 60)
-    print("Angie ACME client required")
-    print("=" * 60)
-    print("The panel vhost uses acme_certificate " + name + ".")
-    print("Add a matching acme_client inside the http { } block.")
-    print("On Debian this is typically /etc/angie/local/http.conf")
-    print("(included from /etc/angie/angie.conf).")
-    print()
-    print(f"""    acme_client {name}
-        https://acme-v02.api.letsencrypt.org/directory
-        challenge=http
-        email=you@example.com
-        renew_before_expiry=30d;
-""")
-    print("Replace you@example.com with your address, then:")
-    print("  sudo angie -t && sudo systemctl reload angie")
-    print("=" * 60)
 
 
 def write_panel_conf(upstream: str, domain: str, service: str, dynamic: bool) -> Path:

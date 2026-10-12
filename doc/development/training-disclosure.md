@@ -609,3 +609,15 @@ Actually, only do that if applicable. Will those logs actually be used on the pu
 Explain to me tersely what files the install will write.
 
 Make separate angie conf files in http.d so that the cron job or other runs easily know whether pterodactyl and mc or just mc is being proxied. Do we even need a cron job? Can we just proxy to a dynamic domain instead or do we need the IP in the angie conf(s)?
+
+Ok, get rid of all the cron logic and replace the static and dynamic args with "--host" and resolve a host using proper angie/nginx configs. If using angie, detect whether this part of the (example is the default; commented by default) angie config is commented (and that there is no non-commented stream section in angie.conf), and instruct user to uncomment it if that is a more standard way to do the stream:
+```
+#stream {
+#    include /etc/angie/stream.d/*.conf;
+#}
+```
+If there is some similar/same structure in nginx instruct the user about that if using nginx.
+
+Uncomment the section automatically, or add it if missing. At the end of setup, warn if any files are in stream.d other than the one we wrote.
+
+We can't put the acme client definition in both files. If it is ok in the file in http.d just do it there and don't instruct to put it in the other file. Also, the correct directive within the server block is acme, not acme_certificate when using angie.
