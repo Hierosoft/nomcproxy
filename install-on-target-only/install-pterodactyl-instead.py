@@ -169,6 +169,9 @@ def php83_from_sury() -> bool:
         text=True,
     )
     return r.returncode == 0 and "packages.sury.org" in r.stdout
+
+
+def php83_available() -> bool:
     """Return True if apt can see the php8.3 package."""
     r = subprocess.run(
         ["apt-cache", "policy", "php8.3"],

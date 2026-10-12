@@ -213,3 +213,17 @@ NameError
 :
 name 'PHP_FPM_SERVICE' is not defined. Did you mean: 'PHP_FPM_SOCK'?
 ```
+
+Yes, I meant PHP 8.3. However, Using the zip provided, I get:
+```
+Traceback (most recent call last):
+  File "/opt/git/nomcproxy/install-on-target-only/./install-pterodactyl-instead.py", line 998, in <module>
+    sys.exit(main())
+             ~~~~^^
+  File "/opt/git/nomcproxy/install-on-target-only/./install-pterodactyl-instead.py", line 958, in main
+    rc = install_php_and_deps()
+  File "/opt/git/nomcproxy/install-on-target-only/./install-pterodactyl-instead.py", line 259, in install_php_and_deps
+    if not php83_available() or not php83_from_sury():
+           ^^^^^^^^^^^^^^^
+NameError: name 'php83_available' is not defined
+```
