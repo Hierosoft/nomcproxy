@@ -1,17 +1,17 @@
 # nomcproxy
 
-Reusable Python module and installer for an nginx/Angie stream reverse proxy
+Reusable Python module and installer for an nginx/Angie reverse proxy
 that hides a home server's IP.
 
-The module can be used programmatically or via the installer for either a
-one-time static IP or a periodically updated dynamic hostname.
+`--host` accepts a hostname or an IPv4 address. Hostnames are re-resolved
+by Angie/nginx (resolver + variable). No cron job.
 
 ## Layout
 
 ```
 nomcproxy/
-  nomcproxy.py              # reusable module + CLI entry for cron
-  install.py                # installer (--dynamic or --static)
+  nomcproxy.py              # reusable module
+  install.py                # installer (--host)
   README.md
   AGENTS.md
   install-on-target-only/   # Python scripts for the home Minecraft server only
@@ -31,47 +31,42 @@ nomcproxy/
 
 Must be run as root from the `nomcproxy` directory (or with the files present).
 
-### Dynamic (cron updates)
+### Host
 
 ```bash
-sudo python3 install.py --dynamic myhost.example.net
-# optionally also proxy a Pterodactyl panel:
-sudo python3 install.py --dynamic myhost.example.net --pterodactyl
+sudo python3 install.py --host myhost.example.net
+sudo python3 install.py --host myhost.example.net \
+  --pterodactyl --pterodactyl-domain play.example.com
+sudo python3 install.py --host 203.0.113.42 \
+  --pterodactyl --pterodactyl-domain play.example.com
 ```
 
-`HOSTNAME` must be a WAN hostname (contains a dot, not an IP address).
-Installs `/etc/cron.d/nomcproxy` that runs every 5 minutes and performs an
-immediate first update.
+A hostname is written with a `resolver` and a variable so Angie/nginx
+re-resolves it. An IPv4 address is written as a direct `proxy_pass`.
 
-`--pterodactyl` (optional) adds a second stream listener on the typical HTTPS
-port (443) that forwards to the private server’s atypical panel port (8443).
-Afterward open `https://<public-proxy-domain-or-ip>` — the home IP and
-dynamic hostname remain hidden.
+Minecraft is a stream server (`/etc/angie/stream.d/nomcproxy-minecraft.conf`).
+Debian comments out the stream include; if so, the installer tells you to
+uncomment it in `angie.conf` (it does not edit that file):
 
-### Static (one-time)
-
-```bash
-sudo python3 install.py --static 203.0.113.42
-# or with panel proxy:
-sudo python3 install.py --static 203.0.113.42 --pterodactyl
+```
+stream {
+    include /etc/angie/stream.d/*.conf;
+}
 ```
 
-Writes the conf once and reloads nginx or Angie. No cron job is installed.
-Rejected if the argument ends with a known dynamic-DNS provider suffix
-(see `DYNAMIC_DNS_HOSTS` in the module), or if the address resolves to
-(or is) this server's own WAN IP.
+`--pterodactyl` adds an HTTP virtual host for the panel
+(`/etc/angie/http.d/nomcproxy-pterodactyl.conf`) and requires
+`--pterodactyl-domain`. That domain must point at this proxy.
 
-nomcproxy is a reverse proxy that hides a *different* server's address.
-Pointing it at the machine it is running on creates a loop and defeats
-the purpose of the software.
+Rejected if `--host` is this server's own WAN IP.
 
 ## Module API
 
 ```python
 import nomcproxy
 
-nomcproxy.update_dynamic("myhost.example.net")   # resolve + conditional update
-nomcproxy.apply_static("203.0.113.42")           # one-time write + reload
+nomcproxy.apply_host("myhost.example.net")
+nomcproxy.apply_host("203.0.113.42", panel_domain="play.example.com")
 ```
 
 ## Checking logs

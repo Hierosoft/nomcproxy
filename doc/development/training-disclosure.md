@@ -572,3 +572,40 @@ server {{
 """)
     print(f"{PHP_FPM_SERVICE} is required. Reload {webserver} after adding the site.")
 ```
+
+- 2026-10-11
+
+In terms of nginx, "Pterodactyl proxy enabled: public port 443 → private port 8443" isn't quite enough and doesn't seem right. It seems like we need to require a domain (as an arg) to the proxy install if we use the pterydactyl option, put pterydactyl on an atypical port after all, then use nginx to expose it as a domain (?).
+```
+./install.py --pterodactyl --dynamic dyndns.example.com
+Pterodactyl proxy enabled: public port 443 → private port 8443
+Access the panel at https://<your-public-proxy-domain-or-ip> (same address you give players for Minecraft). The home/private IP and dynamic hostname stay hidden.
+Installed cron job: /etc/cron.d/nomcproxy
+  runs: */5 * * * * as root
+  command: /opt/git/nomcproxy/nomcproxy.py --dynamic dyndns.example.com
+2026-10-11 22:07:45 INFO     Resolved dyndns.example.com → ... (service=angie, conf=/etc/angie/conf.d/nomcproxy.conf)
+2026-10-11 22:07:45 INFO     Updating conf: missing → ...
+2026-10-11 22:07:45 INFO     Reloaded angie
+2026-10-11 22:07:45 INFO     Update complete
+Initial dynamic update completed
+```
+I redacted specifics, but you get the idea. There are other websites on the server, so just going to the ip address results in mismatched domain on cert and the default website appears. I want the user to be able to type in the domain in minecraft or a browser and for it to work.
+
+At the end of setup, if using pterodactyl and angie is detected, print instructions on how to add a new acme object definition to angie.conf (typically add it to /etc/angie/local/http.conf which is included though), since that requires a new acme variable (show it as domain.replace(".", "_")). For example:
+```
+    acme_client play_example_com
+        https://acme-v02.api.letsencrypt.org/directory
+        challenge=http
+        email=redacted@example.com
+        renew_before_expiry=30d;
+```
+
+replace any character that isn't a letter or number with "_" actually, when generating the example block name.
+
+Make sure that generated name is used in the angie conf file we generate and save as well so that https works.
+
+Actually, only do that if applicable. Will those logs actually be used on the public proxy?
+
+Explain to me tersely what files the install will write.
+
+Make separate angie conf files in http.d so that the cron job or other runs easily know whether pterodactyl and mc or just mc is being proxied. Do we even need a cron job? Can we just proxy to a dynamic domain instead or do we need the IP in the angie conf(s)?
