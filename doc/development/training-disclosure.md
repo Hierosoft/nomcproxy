@@ -131,7 +131,7 @@ http {
     default_type  application/octet-stream;
 
         resolver 8.8.8.8 1.1.1.1 valid=300s;   # or 127.0.0.53 if you use systemd-resolved
-        acme_client le https://acme-v02.api.letsencrypt.org/directory email=firstcomputer@gmail.com;
+        acme_client le https://acme-v02.api.letsencrypt.org/directory email=redacted@example.com;
 
 
     log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
@@ -226,4 +226,349 @@ Traceback (most recent call last):
     if not php83_available() or not php83_from_sury():
            ^^^^^^^^^^^^^^^
 NameError: name 'php83_available' is not defined
+```
+
+- 2026-10-11
+
+It is taking over a minute here, is that normal?
+```
+67 packages you are using are looking for funding.
+Use the `composer fund` command to find out more!
+> @php artisan p:environment:addons:run-hooks post-install || true
+Running: php8.3 artisan key:generate --force
+
+   INFO  Application key set successfully.
+
+Running: php8.3 artisan migrate --seed --force
+
+   INFO  Preparing database.
+
+  Creating migration table ....................................................................... 3s DONE
+
+   INFO  Loading stored database schemas.
+
+  database/schema/mysql-schema.sql
+```
+Then I get:
+```
+........................................................... 1m 46s DONE
+
+   INFO  Running migrations.
+
+  2024_07_13_091852_clear_unused_allocation_notes ............................................ 1.64ms DONE
+
+
+   INFO  Seeding database.
+
+  Database\Seeders\NestSeeder .................................................................... RUNNING
+  Database\Seeders\NestSeeder ................................................................ 359 ms DONE
+
+  Database\Seeders\EggSeeder ..................................................................... RUNNING
+*********************************************
+*     Updating Eggs for Nest: Minecraft     *
+*********************************************
+
+Created Forge Minecraft
+Created Vanilla Minecraft
+Created Paper
+Created Sponge (SpongeVanilla)
+Created Bungeecord
+
+*************************************************
+*     Updating Eggs for Nest: Source Engine     *
+*************************************************
+
+Created Insurgency
+Created Team Fortress 2
+Created Ark: Survival Evolved
+Created Garrys Mod
+Created Counter-Strike: Global Offensive
+Created Custom Source Engine Game
+
+*************************************************
+*     Updating Eggs for Nest: Voice Servers     *
+*************************************************
+
+Created Mumble Server
+Created Teamspeak3 Server
+
+****************************************
+*     Updating Eggs for Nest: Rust     *
+****************************************
+
+Created Rust
+
+  Database\Seeders\EggSeeder ............................................................... 1,776 ms DONE
+
+Running: php8.3 artisan p:user:make --email=admin@localhost --username=admin --name-first=Admin --name-last=User --password=... --admin=1 --no-interaction
+
+In Model.php line 50:
+
+  Could not save Pterodactyl\Models\User[]: failed to validate data: {"email":["The email must be a valid
+   email address."]}
+
+
+Error: php8.3 artisan p:user:make --email=admin@localhost --username=admin --name-first=Admin --name-last=User --password=... --admin=1 --no-interaction failed with exit code 1
+
+============================================================
+CREDENTIALS (save these now)
+============================================================
+...
+```
+I redacted private info using "..." but you get the idea. Require "--admin-email" followed by a valid email for install to start.
+
+Did user:make really work? It went by so fast running again with the newest install code:
+```
+Summary:
+  Upgrading: 0, Installing: 0, Removing: 0, Not Upgrading: 30
+Starting php8.3-fpm...
+Synchronizing state of php8.3-fpm.service with SysV service script with /usr/lib/systemd/systemd-sysv-install.
+Executing: /usr/lib/systemd/systemd-sysv-install enable php8.3-fpm
+php8.3-fpm is active
+Pterodactyl panel already installed; skipping base install.
+Warning: site conf /etc/angie/http.d/pterodactyl.conf already done; skipping
+
+============================================================
+Egg / yolk for blightfall
+============================================================
+Blightfall (1.7.10) egg:
+  1. Download the Blightfall egg JSON:
+     https://eggs.pterodactyl.io/egg/games-blightfall/
+     (or the raw egg-blightfall.json from the ptero-eggs repo).
+  2. Admin → Nests → Import Egg, upload the JSON.
+  3. On the server Startup page set the Docker image (yolk) to:
+     ghcr.io/pterodactyl/yolks:java_8
+     (Blightfall / Forge 1.7.10 requires Java 8).
+  4. Allocate port 25565 (or your chosen port) and start the server.
+
+Full automatic egg import requires a panel API key created after
+first login; that step is left manual so you can verify the import.
+
+============================================================
+Router port forwards (on the home/private network)
+============================================================
+Forward these TCP ports to this machine so the public proxy can reach them:
+  8443/tcp   Pterodactyl panel (atypical; proxy exposes it as 443)
+  25565/tcp   Minecraft game (default allocation)
+  8080/tcp   Wings API (needed if the panel manages this node)
+  2022/tcp   Wings SFTP
+
+Minecraft port notes:
+  - Vanilla and Blightfall both default to 25565.
+  - If you allocate a different port in the panel, forward that port instead
+    and update the nomcproxy backend port to match.
+
+After the proxy is configured with --pterodactyl, players and you
+reach everything via the public proxy address only:
+  Minecraft:  <public-proxy-ip-or-domain>:25565
+  Panel:      https://<public-proxy-ip-or-domain>  (port 443)
+The home IP and dynamic hostname are never given out.
+
+============================================================
+Next step on the public proxy
+============================================================
+On the VPS that runs nomcproxy, re-run the installer with --pterodactyl:
+  sudo python3 install.py --dynamic <your-home-dynamic-hostname> --pterodactyl
+  # or
+  sudo python3 install.py --static <home-ip> --pterodactyl
+
+That makes the proxy listen on the typical HTTPS port and forward
+to this machine's port 8443. You and players then use only
+the public proxy domain/IP; the home IP and dynamic hostname stay hidden.
+
+Access after the proxy is configured:
+  Panel:     https://<public-proxy-domain-or-ip>
+  Minecraft: <public-proxy-domain-or-ip>:25565
+
+============================================================
+CREDENTIALS (save these now)
+============================================================
+  [database]
+    username: pterodactyl
+    database: panel
+    host: 127.0.0.1
+    password: redacted
+  [admin]
+    email: redacted@example.com
+    username: admin
+  file: /root/nomcproxy-pterodactyl-credentials.json
+============================================================
+```
+
+Examine this output and add more output if necessary so we can know what was actually done. Also, determine from this output whether setup is complete or whether that can't be determined from the output of this version.
+```
+root@redacted:/opt/git/nomcproxy/install-on-target-only# ./install-pterodactyl-instead.py --blightfall --admin-email redacted@example.com
+Loaded credentials from /root/nomcproxy-pterodactyl-credentials.json
+Installing SURY php8.3 packages and Pterodactyl panel dependencies...
+Running: sudo apt update
+Hit:1 https://security.debian.org/debian-security trixie-security InRelease
+Hit:2 https://packages.sury.org/php trixie InRelease
+Hit:3 https://deb.debian.org/debian trixie InRelease
+Hit:4 https://deb.debian.org/debian trixie-updates InRelease
+Hit:5 https://download.angie.software/angie/debian/13 trixie InRelease
+30 packages can be upgraded. Run 'apt list --upgradable' to see them.
+Pinned php8.3* to packages.sury.org (/etc/apt/preferences.d/sury-php83)
+Running: sudo apt install -y php8.3 php8.3-common php8.3-cli php8.3-gd php8.3-mysql php8.3-mbstring php8.3-bcmath php8.3-xml php8.3-fpm php8.3-curl php8.3-zip mariadb-server tar unzip git redis-server curl software-properties-common apt-transport-https ca-certificates gnupg lsb-release
+php8.3 is already the newest version (8.3.35-1+0~20260925.87+debian13~1.gbp19383d).
+php8.3-common is already the newest version (8.3.35-1+0~20260925.87+debian13~1.gbp19383d).
+php8.3-cli is already the newest version (8.3.35-1+0~20260925.87+debian13~1.gbp19383d).
+php8.3-gd is already the newest version (8.3.35-1+0~20260925.87+debian13~1.gbp19383d).
+php8.3-mysql is already the newest version (8.3.35-1+0~20260925.87+debian13~1.gbp19383d).
+php8.3-mbstring is already the newest version (8.3.35-1+0~20260925.87+debian13~1.gbp19383d).
+php8.3-bcmath is already the newest version (8.3.35-1+0~20260925.87+debian13~1.gbp19383d).
+php8.3-xml is already the newest version (8.3.35-1+0~20260925.87+debian13~1.gbp19383d).
+php8.3-fpm is already the newest version (8.3.35-1+0~20260925.87+debian13~1.gbp19383d).
+php8.3-curl is already the newest version (8.3.35-1+0~20260925.87+debian13~1.gbp19383d).
+php8.3-zip is already the newest version (8.3.35-1+0~20260925.87+debian13~1.gbp19383d).
+mariadb-server is already the newest version (1:11.8.6-0+deb13u1).
+tar is already the newest version (1.35+dfsg-3.1).
+unzip is already the newest version (6.0-29+deb13u1).
+git is already the newest version (1:2.47.3-0+deb13u1).
+redis-server is already the newest version (5:8.0.2-3+deb13u3).
+curl is already the newest version (8.14.1-2+deb13u5).
+software-properties-common is already the newest version (0.99.30-4.1~deb12u1).
+apt-transport-https is already the newest version (3.0.3).
+ca-certificates is already the newest version (20250419).
+gnupg is already the newest version (2.4.7-21+deb13u1).
+lsb-release is already the newest version (12.1-1).
+Summary:
+  Upgrading: 0, Installing: 0, Removing: 0, Not Upgrading: 30
+Starting php8.3-fpm...
+Synchronizing state of php8.3-fpm.service with SysV service script with /usr/lib/systemd/systemd-sysv-install.
+Executing: /usr/lib/systemd/systemd-sysv-install enable php8.3-fpm
+php8.3-fpm is active
+Warning: composer already done; skipping
+Warning: panel download already done; skipping
+Running: chmod -R 755 /var/www/pterodactyl/storage /var/www/pterodactyl/bootstrap/cache
+Running: chown -R www-data:www-data /var/www/pterodactyl
+Warning: database user (stored password validates) already done; skipping
+Warning: environment file already done; skipping
+Warning: composer install already done; skipping
+Warning: application key already done; skipping
+Warning: migrations already done; skipping
+Running: php8.3 artisan p:user:make --email=redacted@example.com --username=admin --name-first=Admin --name-last=User --password=redacted --admin=1 --no-interaction
++----------+--------------------------------------+
+| Field    | Value                                |
++----------+--------------------------------------+
+| UUID     | 6e56351d-c88f-4e78-aed7-ffb02dea1218 |
+| Email    | redacted@example.com              |
+| Username | admin                                |
+| Name     | Admin User                           |
+| Admin    | Yes                                  |
++----------+--------------------------------------+
+Saved credentials to /root/nomcproxy-pterodactyl-credentials.json
+Running: systemctl daemon-reload
+Running: systemctl enable --now redis-server
+Synchronizing state of redis-server.service with SysV service script with /usr/lib/systemd/systemd-sysv-install.
+Executing: /usr/lib/systemd/systemd-sysv-install enable redis-server
+Running: systemctl enable --now pteroq.service
+Created symlink '/etc/systemd/system/multi-user.target.wants/pteroq.service' → '/etc/systemd/system/pteroq.service'.
+Warning: site conf /etc/angie/http.d/pterodactyl.conf already done; skipping
+
+============================================================
+Egg / yolk for blightfall
+============================================================
+Blightfall (1.7.10) egg:
+  1. Download the Blightfall egg JSON:
+     https://eggs.pterodactyl.io/egg/games-blightfall/
+     (or the raw egg-blightfall.json from the ptero-eggs repo).
+  2. Admin → Nests → Import Egg, upload the JSON.
+  3. On the server Startup page set the Docker image (yolk) to:
+     ghcr.io/pterodactyl/yolks:java_8
+     (Blightfall / Forge 1.7.10 requires Java 8).
+  4. Allocate port 25565 (or your chosen port) and start the server.
+
+Full automatic egg import requires a panel API key created after
+first login; that step is left manual so you can verify the import.
+
+============================================================
+Router port forwards (on the home/private network)
+============================================================
+Forward these TCP ports to this machine so the public proxy can reach them:
+  8443/tcp   Pterodactyl panel (atypical; proxy exposes it as 443)
+  25565/tcp   Minecraft game (default allocation)
+  8080/tcp   Wings API (needed if the panel manages this node)
+  2022/tcp   Wings SFTP
+
+Minecraft port notes:
+  - Vanilla and Blightfall both default to 25565.
+  - If you allocate a different port in the panel, forward that port instead
+    and update the nomcproxy backend port to match.
+
+After the proxy is configured with --pterodactyl, players and you
+reach everything via the public proxy address only:
+  Minecraft:  <public-proxy-ip-or-domain>:25565
+  Panel:      https://<public-proxy-ip-or-domain>  (port 443)
+The home IP and dynamic hostname are never given out.
+
+============================================================
+Next step on the public proxy
+============================================================
+On the VPS that runs nomcproxy, re-run the installer with --pterodactyl:
+  sudo python3 install.py --dynamic <your-home-dynamic-hostname> --pterodactyl
+  # or
+  sudo python3 install.py --static <home-ip> --pterodactyl
+
+That makes the proxy listen on the typical HTTPS port and forward
+to this machine's port 8443. You and players then use only
+the public proxy domain/IP; the home IP and dynamic hostname stay hidden.
+
+Access after the proxy is configured:
+  Panel:     https://<public-proxy-domain-or-ip>
+  Minecraft: <public-proxy-domain-or-ip>:25565
+
+============================================================
+CREDENTIALS (save these now)
+============================================================
+  [database]
+    username: pterodactyl
+    database: panel
+    host: 127.0.0.1
+    password: redacted
+  [admin]
+    email: redacted@example.com
+    username: admin
+    password: redacted
+  file: /root/nomcproxy-pterodactyl-credentials.json
+============================================================
+```
+
+Confirm this code isn't necessary anymore and explain why or why not:
+```
+    """Print config using php8.3-fpm for the already-running nginx or angie.
+
+    The panel site is an http server block. On Debian 13 Angie the default
+    conf includes /etc/angie/http.d/*.conf from inside the http { } block,
+    so that directory is preferred when it exists.
+    """
+    print()
+    print(f"Using web server: {webserver}")
+    print(f"Configure the panel site to listen on port {PANEL_PORT} (not 80/443).")
+    print(f"PHP-FPM socket: {PHP_FPM_SOCK}")
+    if webserver == "angie":
+        http_d = Path("/etc/angie/http.d")
+        conf_dir = str(http_d) if http_d.is_dir() else "/etc/angie/conf.d"
+    else:
+        conf_dir = "/etc/nginx/conf.d"
+    print(f"Example ({webserver}) server block for {conf_dir}/pterodactyl.conf:")
+    print("(included from the http block via the existing wildcard; do not put it in stream)")
+    print(f"""
+server {{
+    listen {PANEL_PORT};
+    server_name _;
+    root /var/www/pterodactyl/public;
+    index index.php;
+    client_max_body_size 100m;
+
+    location / {{
+        try_files $uri $uri/ /index.php?$query_string;
+    }}
+    location ~ \\.php$ {{
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_pass unix:{PHP_FPM_SOCK};
+    }}
+}}
+""")
+    print(f"{PHP_FPM_SERVICE} is required. Reload {webserver} after adding the site.")
 ```

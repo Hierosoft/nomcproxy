@@ -367,6 +367,30 @@ class ServerInstallState:
         self.webserver: str | None = None
         self.file_existed_at_start = False
         self.loaded_ok = False
+        self.steps: OrderedDict[str, str] = OrderedDict()
+
+    def record(self, step: str, result: str) -> None:
+        """result is done, skipped, or failed."""
+        self.steps[step] = result
+        print(f"[{result}] {step}")
+
+    def print_summary(self) -> None:
+        if not self.steps:
+            return
+        print()
+        print("=" * 60)
+        print("SETUP STATUS")
+        print("=" * 60)
+        for step, result in self.steps.items():
+            print(f"  {result:8} {step}")
+        failed = [s for s, r in self.steps.items() if r == "failed"]
+        if failed:
+            print("Result: INCOMPLETE")
+        else:
+            print("Result: panel base install complete")
+            print("Still manual: import the egg, create the server, install Wings,")
+            print("forward router ports, then run install.py --pterodactyl on the proxy.")
+        print("=" * 60)
 
     def load(self) -> int:
         self.file_existed_at_start = self.path.is_file()
@@ -600,15 +624,17 @@ def cron_present() -> bool:
     return "pterodactyl/artisan schedule:run" in existing.stdout
 
 
-def warn_skip(step: str) -> None:
+def warn_skip(step: str, state: ServerInstallState | None = None) -> None:
     print(f"Warning: {step} already done; skipping")
+    if state is not None:
+        state.record(step, "skipped")
 
 
 def setup_database(state: ServerInstallState) -> int:
     """Create the panel database and user, or reuse a validated password."""
     stored = state.get("database", "password")
     if stored and db_password_works(stored):
-        warn_skip("database user (stored password validates)")
+        warn_skip("database user (stored password validates)", state)
         return 0
     if stored and not db_password_works(stored):
         echo0("Error: stored database password does not authenticate; not generating a new one")
@@ -634,7 +660,10 @@ def setup_database(state: ServerInstallState) -> int:
     state.set_field("database", "database", "panel")
     state.set_field("database", "host", "127.0.0.1")
     state.set_field("database", "password", password)
-    return state.save()
+    rc = state.save()
+    if rc == 0:
+        state.record("database user", "done")
+    return rc
 
 
 def write_env(db_password: str) -> int:
@@ -696,9 +725,10 @@ def migrate_seed() -> int:
 def create_admin(state: ServerInstallState) -> int:
     if admin_user_exists():
         if state.has_password("admin"):
-            warn_skip("admin user (already present; using stored password)")
+            warn_skip("admin user (already present; using stored password)", state)
             return 0
         echo0("Error: admin user exists but no stored password; not generating a new one")
+        state.record("admin user", "failed")
         return 1
     password = state.get("admin", "password") or gen_password()
     rc = run(
@@ -718,16 +748,22 @@ def create_admin(state: ServerInstallState) -> int:
         return rc
     if not admin_user_exists():
         echo0("Error: admin create reported success but user was not found")
+        state.record("admin user", "failed")
         return 1
     state.set_field("admin", "username", "admin")
     state.set_field("admin", "email", state.get("admin", "email") or "")
     state.set_field("admin", "password", password)
-    return state.save()
+    rc = state.save()
+    if rc != 0:
+        return rc
+    state.record("admin user", "done")
+    print("Admin user created and validated (password stored)")
+    return 0
 
 
-def install_queue_and_cron() -> int:
+def install_queue_and_cron(state: ServerInstallState) -> int:
     if is_service_active("pteroq") and cron_present():
-        warn_skip("queue worker and cron")
+        warn_skip("queue worker and cron", state)
         return 0
     if not is_service_active("pteroq"):
         unit = Path("/etc/systemd/system/pteroq.service")
@@ -749,17 +785,26 @@ WantedBy=multi-user.target
 """)
         rc = run(["systemctl", "daemon-reload"])
         if rc != 0:
+            state.record("queue worker", "failed")
             return rc
         rc = run(["systemctl", "enable", "--now", "redis-server"])
         if rc != 0:
+            state.record("queue worker", "failed")
             return rc
         rc = run(["systemctl", "enable", "--now", "pteroq.service"])
         if rc != 0:
+            state.record("queue worker", "failed")
             return rc
+        if not is_service_active("pteroq"):
+            echo0("Error: pteroq.service is not active after enable")
+            state.record("queue worker", "failed")
+            return 1
+        state.record("queue worker", "done")
+        print("pteroq.service is active")
     else:
-        warn_skip("queue worker")
+        warn_skip("queue worker", state)
     if cron_present():
-        warn_skip("cron")
+        warn_skip("cron", state)
         return 0
     cron_line = "* * * * * /usr/bin/php8.3 /var/www/pterodactyl/artisan schedule:run >> /dev/null 2>&1\n"
     existing = subprocess.run(["crontab", "-l"], capture_output=True, text=True)
@@ -771,7 +816,14 @@ WantedBy=multi-user.target
     r = subprocess.run(["crontab", "-"], input=new, text=True)
     if r.returncode != 0:
         echo0("Error: failed to install cron")
+        state.record("cron", "failed")
         return r.returncode
+    if not cron_present():
+        echo0("Error: cron line was not found after install")
+        state.record("cron", "failed")
+        return 1
+    state.record("cron", "done")
+    print("cron schedule:run installed")
     return 0
 
 
@@ -818,22 +870,28 @@ def write_site_conf(webserver: str) -> int:
 def install_panel(state: ServerInstallState) -> int:
     """Full getting-started install. Skips steps already done. Returns 0 on success."""
     if shutil.which("composer"):
-        warn_skip("composer")
+        warn_skip("composer", state)
     else:
         rc = install_composer()
         if rc != 0:
+            state.record("composer", "failed")
             return rc
+        state.record("composer", "done")
 
     if pterodactyl_installed():
-        warn_skip("panel download")
+        warn_skip("panel download", state)
     else:
         rc = download_panel()
         if rc != 0:
+            state.record("panel download", "failed")
             return rc
+        state.record("panel download", "done")
 
     rc = set_panel_permissions()
     if rc != 0:
+        state.record("permissions", "failed")
         return rc
+    state.record("permissions", "done")
 
     rc = setup_database(state)
     if rc != 0:
@@ -845,14 +903,16 @@ def install_panel(state: ServerInstallState) -> int:
 
     env_file = PANEL_DIR / ".env"
     if env_file.is_file() and f"DB_PASSWORD={db_password}" in env_file.read_text():
-        warn_skip("environment file")
+        warn_skip("environment file", state)
     else:
         rc = write_env(db_password)
         if rc != 0:
+            state.record("environment file", "failed")
             return rc
+        state.record("environment file", "done")
 
     if (PANEL_DIR / "vendor" / "autoload.php").is_file():
-        warn_skip("composer install")
+        warn_skip("composer install", state)
     else:
         env = os.environ.copy()
         env["COMPOSER_ALLOW_SUPERUSER"] = "1"
@@ -862,74 +922,49 @@ def install_panel(state: ServerInstallState) -> int:
             env=env,
         )
         if rc != 0:
+            state.record("composer install", "failed")
             return rc
+        state.record("composer install", "done")
 
     if app_key_present():
-        warn_skip("application key")
+        warn_skip("application key", state)
     else:
         rc = run([PHP_BIN, "artisan", "key:generate", "--force"], cwd=PANEL_DIR)
         if rc != 0:
+            state.record("application key", "failed")
             return rc
         if not app_key_present():
             echo0("Error: key:generate did not write APP_KEY")
+            state.record("application key", "failed")
             return 1
+        state.record("application key", "done")
 
     if migrations_present():
-        warn_skip("migrations")
+        warn_skip("migrations", state)
     else:
         rc = migrate_seed()
         if rc != 0:
+            state.record("migrations", "failed")
             return rc
         if not migrations_present():
             echo0("Error: migrate did not create the migrations table")
+            state.record("migrations", "failed")
             return 1
+        state.record("migrations", "done")
 
     rc = create_admin(state)
     if rc != 0:
         return rc
-    rc = install_queue_and_cron()
+    rc = install_queue_and_cron(state)
     if rc != 0:
         return rc
     rc = write_site_conf(state.webserver or "nginx")
     if rc != 0:
+        state.record("site conf", "failed")
         return rc
+    if "site conf" not in " ".join(state.steps):
+        state.record("site conf", "done")
     return 0
-    """Print config using php8.3-fpm for the already-running nginx or angie.
-
-    The panel site is an http server block. On Debian 13 Angie the default
-    conf includes /etc/angie/http.d/*.conf from inside the http { } block,
-    so that directory is preferred when it exists.
-    """
-    print()
-    print(f"Using web server: {webserver}")
-    print(f"Configure the panel site to listen on port {PANEL_PORT} (not 80/443).")
-    print(f"PHP-FPM socket: {PHP_FPM_SOCK}")
-    if webserver == "angie":
-        http_d = Path("/etc/angie/http.d")
-        conf_dir = str(http_d) if http_d.is_dir() else "/etc/angie/conf.d"
-    else:
-        conf_dir = "/etc/nginx/conf.d"
-    print(f"Example ({webserver}) server block for {conf_dir}/pterodactyl.conf:")
-    print("(included from the http block via the existing wildcard; do not put it in stream)")
-    print(f"""
-server {{
-    listen {PANEL_PORT};
-    server_name _;
-    root /var/www/pterodactyl/public;
-    index index.php;
-    client_max_body_size 100m;
-
-    location / {{
-        try_files $uri $uri/ /index.php?$query_string;
-    }}
-    location ~ \\.php$ {{
-        include fastcgi_params;
-        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
-        fastcgi_pass unix:{PHP_FPM_SOCK};
-    }}
-}}
-""")
-    print(f"{PHP_FPM_SERVICE} is required. Reload {webserver} after adding the site.")
 
 
 def main() -> int:
@@ -1013,6 +1048,7 @@ def main() -> int:
         print(f"  Minecraft: <public-proxy-domain-or-ip>:{MINECRAFT_PORT}")
         return 0
     finally:
+        state.print_summary()
         state.print_credentials()
 
 
