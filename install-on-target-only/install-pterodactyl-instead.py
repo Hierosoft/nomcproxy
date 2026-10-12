@@ -301,13 +301,23 @@ def print_egg_instructions(mode: str) -> None:
 
 
 def configure_webserver_port(webserver: str) -> None:
-    """Print config using php8.3-fpm for the already-running nginx or angie."""
+    """Print config using php8.3-fpm for the already-running nginx or angie.
+
+    The panel site is an http server block. On Debian 13 Angie the default
+    conf includes /etc/angie/http.d/*.conf from inside the http { } block,
+    so that directory is preferred when it exists.
+    """
     print()
     print(f"Using web server: {webserver}")
     print(f"Configure the panel site to listen on port {PANEL_PORT} (not 80/443).")
     print(f"PHP-FPM socket: {PHP_FPM_SOCK}")
-    conf_dir = "/etc/angie/conf.d" if webserver == "angie" else "/etc/nginx/conf.d"
+    if webserver == "angie":
+        http_d = Path("/etc/angie/http.d")
+        conf_dir = str(http_d) if http_d.is_dir() else "/etc/angie/conf.d"
+    else:
+        conf_dir = "/etc/nginx/conf.d"
     print(f"Example ({webserver}) server block for {conf_dir}/pterodactyl.conf:")
+    print("(included from the http block via the existing wildcard; do not put it in stream)")
     print(f"""
 server {{
     listen {PANEL_PORT};

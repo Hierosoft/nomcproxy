@@ -111,3 +111,54 @@ Never install nginx, angie, nor apache2, in case the person has a packaged or co
 provide an updated zip
 
 Instead of using sys.exit more than one place (in if __name__ == "__main__") return nonzero from functions where necessary, and when each of the functions now containing exit are called, instead capture the return in the caller and if non-zero, return early with that code as necessary. Logic should flow all the way back to main every time so that functions are modular. Main can also exit early as necessary if it receives non-zero return codes where that would prevent a successful install. Then provide an updated zip.
+
+Can the conf on the target server be included with the other wildcard files in the http block like in the default angie conf of debian 13?
+```
+user  www-data;
+worker_processes  auto;
+worker_rlimit_nofile 65536;
+
+error_log  /var/log/angie/error.log notice;
+pid        /run/angie.pid;
+
+events {
+    worker_connections  65536;
+}
+
+
+http {
+    include       /etc/angie/mime.types;
+    default_type  application/octet-stream;
+
+        resolver 8.8.8.8 1.1.1.1 valid=300s;   # or 127.0.0.53 if you use systemd-resolved
+        acme_client le https://acme-v02.api.letsencrypt.org/directory email=firstcomputer@gmail.com;
+
+
+    log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+                      '$status $body_bytes_sent "$http_referer" '
+                      '"$http_user_agent" "$http_x_forwarded_for"';
+
+    log_format extended '$remote_addr - $remote_user [$time_local] "$request" '
+                        '$status $body_bytes_sent "$http_referer" rt="$request_time" '
+                        '"$http_user_agent" "$http_x_forwarded_for" '
+                        'h="$host" sn="$server_name" ru="$request_uri" u="$uri" '
+                        'ucs="$upstream_cache_status" ua="$upstream_addr" us="$upstream_status" '
+                        'uct="$upstream_connect_time" urt="$upstream_response_time"';
+
+    access_log  /var/log/angie/access.log  main;
+
+    sendfile        on;
+    #tcp_nopush     on;
+
+    keepalive_timeout  65;
+
+    #gzip  on;
+
+    include /etc/angie/http.d/*.conf;
+}
+
+#stream {
+#    include /etc/angie/stream.d/*.conf;
+#}
+```
+If so, recommend using /etc/angie/http.d instead of conf.d if http.d is present.
