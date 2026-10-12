@@ -986,16 +986,11 @@ def main() -> int:
         if rc != 0:
             return rc
 
-        already = pterodactyl_installed()
-        if not already:
-            rc = install_panel(state)
-            if rc != 0:
-                return rc
-        else:
-            print("Pterodactyl panel already installed; skipping base install.")
-            rc = write_site_conf(webserver)
-            if rc != 0:
-                return rc
+        # install_panel skips steps that are already done (panel files, DB, etc.)
+        # and still creates the admin user if it was never validated.
+        rc = install_panel(state)
+        if rc != 0:
+            return rc
 
         print_egg_instructions(mode)
         print_port_forward_instructions()
