@@ -128,6 +128,76 @@ def run_apt(args: list[str]) -> int:
     return subprocess.run(full).returncode
 
 
+def php83_available() -> bool:
+    """Return True if apt can see the php8.3 package."""
+    r = subprocess.run(
+        ["apt-cache", "policy", "php8.3"],
+        capture_output=True,
+        text=True,
+    )
+    # "Candidate: (none)" or missing package means not available
+    return r.returncode == 0 and "Candidate: (none)" not in r.stdout and "php8.3:" in r.stdout
+
+
+def ensure_sury_php_repo() -> int:
+    """Add Ondřej Surý's PHP repo so Debian can install php8.3.
+
+    Debian 13 ships 8.4; 8.3 is required by Pterodactyl and comes from SURY.
+    """
+    print("php8.3 not in default repos; adding SURY PHP repository...")
+    # Prerequisites
+    if run_apt(["install", "-y", "ca-certificates", "curl", "lsb-release", "gnupg"]) != 0:
+        echo0("Error: failed to install SURY prerequisites")
+        return 1
+
+    keyring = Path("/usr/share/keyrings/deb.sury.org-php.gpg")
+    list_file = Path("/etc/apt/sources.list.d/sury-php.list")
+
+    if not keyring.is_file():
+        print("Installing SURY archive key...")
+        r = subprocess.run(
+            [
+                "sudo", "curl", "-fsSLo", str(keyring),
+                "https://packages.sury.org/php/apt.gpg",
+            ],
+            capture_output=True,
+            text=True,
+        )
+        if r.returncode != 0:
+            echo0(f"Error: failed to download SURY key: {r.stderr}")
+            return 1
+
+    if not list_file.is_file():
+        # Codename (trixie, bookworm, ...)
+        codename = subprocess.run(
+            ["lsb_release", "-sc"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+        line = (
+            f"deb [signed-by={keyring}] https://packages.sury.org/php/ "
+            f"{codename} main\n"
+        )
+        subprocess.run(
+            ["sudo", "tee", str(list_file)],
+            input=line,
+            text=True,
+            check=True,
+        )
+        print(f"Added SURY PHP repo for {codename}")
+
+    if run_apt(["update"]) != 0:
+        echo0("Error: apt update failed after adding SURY")
+        return 1
+
+    if not php83_available():
+        echo0("Error: php8.3 still not available after adding SURY")
+        return 1
+    print("php8.3 is now available")
+    return 0
+
+
 def install_php_and_deps() -> int:
     """Install PHP 8.3 and Pterodactyl dependencies if apt is available."""
     if not apt_cmd():
@@ -140,6 +210,11 @@ def install_php_and_deps() -> int:
     if run_apt(["update"]) != 0:
         echo0("Error: apt update failed")
         return 1
+
+    # Debian 13 (and some others) only ship a newer PHP; add SURY for 8.3
+    if not php83_available():
+        if ensure_sury_php_repo() != 0:
+            return 1
 
     packages = PHP_PACKAGES + OTHER_PACKAGES
     if run_apt(["install", "-y"] + packages) != 0:

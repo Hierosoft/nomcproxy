@@ -75,3 +75,31 @@ I meant: If /opt/minecraft/server.md is detected at the start of proxy install, 
 The canvas keeps going inactive then reviving workspaces if I go to Preview then back to canvas, even if I download the files one by one. The problem started today. Also, starting today, if I right-click any folder then click download, it says "Could not download" that folder name, "try again." I can only download one file at a time.
 
 Both symptoms happen in Waterfox and 153.0.8010.52 (Official Build) for Linux Mint (x86_64) starting today and never happened before. Then again I never used Canvas without a project. Nonetheless, if I move this chat to a project, the problem still happens.
+
+- 2026-10-11
+
+On debian 13 I have php8.4 but for the 8.3 install via the script I get:
+```
+Error: Unable to locate package php8.3
+Error: Couldn't find any package by glob 'php8.3'
+Error: Package 'php8.3-common' has no installation candidate
+Error: Unable to locate package php8.3-cli
+Error: Couldn't find any package by glob 'php8.3-cli'
+Error: Unable to locate package php8.3-gd
+Error: Couldn't find any package by glob 'php8.3-gd'
+Error: Unable to locate package php8.3-mysql
+Error: Couldn't find any package by glob 'php8.3-mysql'
+Error: Unable to locate package php8.3-mbstring
+Error: Couldn't find any package by glob 'php8.3-mbstring'
+Error: Unable to locate package php8.3-bcmath
+Error: Couldn't find any package by glob 'php8.3-bcmath'
+Error: Unable to locate package php8.3-xml
+Error: Couldn't find any package by glob 'php8.3-xml'
+Error: Unable to locate package php8.3-fpm
+Error: Couldn't find any package by glob 'php8.3-fpm'
+Error: Unable to locate package php8.3-curl
+Error: Couldn't find any package by glob 'php8.3-curl'
+Error: Unable to locate package php8.3-zip
+Error: Couldn't find any package by glob 'php8.3-zip'
+Error: package install failed
+```
