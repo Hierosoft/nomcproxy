@@ -422,7 +422,28 @@ def panel_conf_dir(service: str) -> Path:
     return Path("/etc/nginx/conf.d")
 
 
+def derive_public_names(domain: str) -> tuple[str, str, str]:
+    """Return (apex, mc_host, panel_host).
+
+    The given name is the apex. mc. and panel. are always prepended.
+    A name that already starts with mc. or panel. and has a further dot
+    is a subdomain, and is rejected. A name like mc.com or panel.com has
+    no further dot, so it is an apex (label plus TLD) and is allowed.
+    """
+    raw = domain.strip().rstrip(".").lower()
+    if not raw or "." not in raw:
+        raise ValueError(f"Error: public domain must contain a dot, got: {domain!r}")
+    for prefix in ("panel.", "mc."):
+        if raw.startswith(prefix) and "." in raw[len(prefix):]:
+            raise ValueError(
+                f'Error: do not pass a {prefix} subdomain; "{prefix}" will be prepended automatically'
+            )
+    return raw, "mc." + raw, "panel." + raw
+
+
 def acme_client_name(domain: str) -> str:
+    """Angie acme_client identifier: non-alphanumeric → underscore."""
+    return re.sub(r"[^A-Za-z0-9]", "_", domain)
     """Angie acme_client identifier: non-alphanumeric → underscore."""
     return re.sub(r"[^A-Za-z0-9]", "_", domain)
 
@@ -431,7 +452,10 @@ def make_panel_conf(upstream: str, domain: str, service: str, dynamic: bool) -> 
     """HTTP virtual host for the panel. Does not listen as a raw TCP 443 grab."""
     name = acme_client_name(domain)
     if service == "angie":
-        acme = f"""# ACME client for this domain. Edit the email, then: angie -t && systemctl reload angie
+        if acme_client_defined(name):
+            acme = f"# reusing existing acme_client {name}\n"
+        else:
+            acme = f"""# ACME client for this domain. Edit the email, then: angie -t && systemctl reload angie
 acme_client {name}
     https://acme-v02.api.letsencrypt.org/directory
     challenge=http
@@ -490,7 +514,57 @@ server {{
 """
 
 
+def acme_client_defined(name: str) -> bool:
+    """True if some http conf already defines this acme_client."""
+    roots = [Path("/etc/angie/http.d"), Path("/etc/angie/conf.d"), Path("/etc/nginx/conf.d")]
+    needle = f"acme_client {name}"
+    for root in roots:
+        if not root.is_dir():
+            continue
+        for path in root.glob("*.conf"):
+            try:
+                if needle in path.read_text():
+                    return True
+            except OSError:
+                continue
+    return False
+
+
+def ensure_dummy_site(apex: str) -> None:
+    """Write a placeholder index.php under /var/www/{apex} if that dir is empty."""
+    site = Path("/var/www") / apex
+    site.mkdir(parents=True, exist_ok=True)
+    if any(site.iterdir()):
+        return
+    (site / "index.php").write_text("<?php echo 'nomcproxy';\n")
+    log.info("Wrote placeholder %s", site / "index.php")
+
+
+def cname_warnings(apex: str, mc_host: str, panel_host: str) -> list[str]:
+    """Names that do not resolve to this proxy's WAN IP."""
+    wan = get_wan_ip()
+    missing = []
+    for host in (mc_host, panel_host):
+        try:
+            ip = resolve_ip(host)
+        except Exception:
+            ip = None
+        if wan is None or ip != wan:
+            missing.append(host)
+    return missing
+
+
 def write_panel_conf(upstream: str, domain: str, service: str, dynamic: bool) -> Path:
+    conf_dir = panel_conf_dir(service)
+    conf_dir.mkdir(parents=True, exist_ok=True)
+    path = conf_dir / PANEL_CONF_NAME
+    path.write_text(make_panel_conf(upstream, domain, service, dynamic))
+    os.chmod(path, 0o644)
+    log.info(
+        "Wrote panel virtual host %s (server_name %s → %s:%s)",
+        path, domain, upstream, PTERODACTYL_PRIVATE_PORT,
+    )
+    return path
     conf_dir = panel_conf_dir(service)
     conf_dir.mkdir(parents=True, exist_ok=True)
     path = conf_dir / PANEL_CONF_NAME

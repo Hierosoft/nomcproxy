@@ -85,21 +85,25 @@ def main() -> int:
 
     if args.pterodactyl and not args.pterodactyl_domain:
         echo0("Error: --pterodactyl requires --pterodactyl-domain DOMAIN")
-        echo0("The domain must point at this proxy. It is the name players type")
-        echo0("in Minecraft and in a browser. Port 443 is not grabbed for all traffic.")
+        echo0("Pass the base domain. mc. and panel. are added automatically.")
         return 1
     if args.pterodactyl_domain and not nomcproxy.is_wan_hostname(args.pterodactyl_domain):
         echo0(f"Error: --pterodactyl-domain must be a hostname, got: {args.pterodactyl_domain!r}")
         return 1
 
+    names = None
     if args.pterodactyl:
-        nomcproxy.set_pterodactyl_domain(args.pterodactyl_domain)
+        try:
+            apex, mc_host, panel_host = nomcproxy.derive_public_names(args.pterodactyl_domain)
+        except ValueError as e:
+            echo0(str(e))
+            return 1
+        names = (apex, mc_host, panel_host)
+        nomcproxy.set_pterodactyl_domain(panel_host)
+        print(f"Minecraft: {mc_host}:{nomcproxy.LISTEN_PORT}")
         print(
-            f"Pterodactyl panel: https://{args.pterodactyl_domain} "
-            f"→ home port {nomcproxy.PTERODACTYL_PRIVATE_PORT} (HTTP virtual host, not a raw 443 TCP grab)"
-        )
-        print(
-            f"Minecraft: {args.pterodactyl_domain}:{nomcproxy.LISTEN_PORT}"
+            f"Pterodactyl panel: https://{panel_host} "
+            f"→ home port {nomcproxy.PTERODACTYL_PRIVATE_PORT}"
         )
         print("The home IP and dynamic hostname stay hidden.")
 
@@ -108,8 +112,11 @@ def main() -> int:
         print(f"Removed obsolete cron job: {OLD_CRON}")
 
     try:
-        service = nomcproxy.apply_host(args.host, panel_domain=args.pterodactyl_domain)
+        panel = names[2] if names else None
+        service = nomcproxy.apply_host(args.host, panel_domain=panel)
         print(f"Configuration applied for {args.host}")
+        if names:
+            nomcproxy.ensure_dummy_site(names[0])
     except Exception as e:
         echo0(f"Error: {e}")
         return 1
@@ -127,6 +134,19 @@ def main() -> int:
         ports.append((80, "tcp", "ACME http-01 challenge"))
         ports.append((nomcproxy.PTERODACTYL_PROXY_PORT, "tcp", "Pterodactyl panel (HTTPS)"))
     nomcproxy.print_firewall_instructions(ports, behind_router=False)
+
+    if names:
+        missing = nomcproxy.cname_warnings(*names)
+        if missing:
+            apex = names[0]
+            print()
+            print("Warning: these names do not resolve to this proxy:")
+            for host in missing:
+                print(f"  {host}")
+            print("Add CNAME records pointing at the base domain:")
+            print(f'  mc     CNAME  "{apex}."')
+            print(f'  panel  CNAME  "{apex}."')
+            print("The trailing dot is the usual CNAME target notation.")
 
     return 0
 

@@ -637,3 +637,27 @@ The include of stream.d is in a stream block already, so we mustn't explicitly s
 Provide instructions for router (in front of server) and detected software firewall (on proxy) even if all of the setup steps are detected as complete. Be sure to specify UDP and/or TCP as necessary. If detected software firewall has a way to easily check if the steps are done, show which steps are done and which are not. If it has that and also has a way to complete the steps automatically, complete them automatically, validate the result, and state which steps are already complete.
 
 Also show (and do if possible) any necessary steps similarly on the server, if it has a firewall service running. In the cases of both server and proxy, if there is no software firewall service running, say so instead of saying any inapplicable steps or saying nothing.
+
+-
+
+After running the appropriate install on the public proxy and home server, if I add a location it doesn't get added to the list and there is no visible error and error in /var/log/angie/error.log (but access.log gets a new entry ...[12/Oct/2026:12:03:07 -0400] "GET /admin/locations HTTP/1.1" 200 13954 "-" "Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0" "108.36.238.202")
+
+Why would I want to use wildcard for TRUSTED_PROXIES?
+
+
+Prepend "mc." to the public domain unless it (as lowercase) already starts with that. If it starts with "panel." and has no dots after that dot, error out and say "panel." will be prepended automatically. Create a relevant acme entry/client or reuse if appropriate, write a dummy index.php to /var/www/{domain}.com if there are no files in there (mc subdomain will be for Minecraft stream proxy, panel subdomain will be for pterydactyl. If either doesn't resolve to IP of proxy, warn at the end of install (even if any/all steps were skipped) that the user must add CNAME records for panel and mc pointing to "{domain}." (trailing dot is typical notation for CNAME records for subdomains; put it in quotes to make the "." explicit in the instructions being printed).
+
+Also explain to the user exactly what to set for the FQDN setting of the Node in Pterodactyl which has the tip:
+```
+Please enter domain name (e.g node.example.com) to be used for connecting to the daemon. An IP address may be used only if you are not using SSL for this node
+```
+
+I meant: If it starts with "panel." and has dots after that dot, error out and say "panel." Use the same rule for mc as for panel: If public domain starts with "mc." and has further dots, that is a problem. The reason I am changing "has no dots" to "has dots" is that if there are no more dots, that would be ok (just leading to tld, not indicating a subdomain). Therefore, always prepend "mc." to the main domain instead of doing it conditionally. The new sanity check ensures the given address is good in the case of both subdomains.
+
+Require the public IP of the proxy as an arg instead of setting TRUSTED_PROXIES to "*".
+
+Remove all traces of MultiLabelZ from your memory in this Grok project including artifacts etc, as that conversation and canvas was accidentally added to this Grok project.
+
+We don't want subdomains on the target only the proxy.
+
+explain if removing the "--public-domain" was ok--do we not need to know the public domain when setting up the server (which may have a private/dynamic domain or IP)?

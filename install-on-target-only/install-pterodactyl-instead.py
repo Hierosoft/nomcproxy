@@ -317,6 +317,38 @@ def print_port_forward_instructions() -> None:
     print("The home IP and dynamic hostname are never given out.")
 
 
+def print_node_fqdn(apex: str) -> None:
+    """Tell the user the exact Node FQDN to enter in the panel.
+
+    The subdomain exists only as DNS on the public proxy, not on this machine.
+    """
+    node = "node." + apex
+    print()
+    print("=" * 60)
+    print("Pterodactyl Node FQDN")
+    print("=" * 60)
+    print("When creating the node, the FQDN field says:")
+    print("  Please enter domain name (e.g node.example.com) to be used for")
+    print("  connecting to the daemon. An IP address may be used only if you")
+    print("  are not using SSL for this node.")
+    print()
+    print(f"Set FQDN to: {node}")
+    print()
+    print("That name is DNS on the public proxy, not a vhost on this machine.")
+    print("It is how the panel and your browser reach Wings (port 8080),")
+    print("not how players join Minecraft.")
+    print("  Do not use the home IP or the dynamic hostname.")
+    print(f"  Do not use {apex} (that is the base domain).")
+    print(f"  Do not use panel.{apex} (that is the panel, on the proxy).")
+    print(f"  Do not use mc.{apex} (that is the Minecraft stream on 25565).")
+    print("An IP is only valid if this node will not use SSL, and it must not")
+    print("be the home address.")
+    print()
+    print(f'On the proxy DNS, add:  node  CNAME  "{apex}."')
+    print("Then proxy TCP 8080 on the VPS to this machine's port 8080.")
+    print("=" * 60)
+
+
 def print_egg_instructions(mode: str) -> None:
     print()
     print("=" * 60)
@@ -666,7 +698,7 @@ def setup_database(state: ServerInstallState) -> int:
     return rc
 
 
-def write_env(db_password: str) -> int:
+def write_env(db_password: str, public_domain: str, proxy_ip: str) -> int:
     env_example = PANEL_DIR / ".env.example"
     env_file = PANEL_DIR / ".env"
     if not env_example.is_file():
@@ -676,11 +708,12 @@ def write_env(db_password: str) -> int:
         shutil.copy(env_example, env_file)
     text = env_file.read_text()
     replacements = {
-        "APP_URL": f"http://127.0.0.1:{PANEL_PORT}",
+        "APP_URL": f"https://{public_domain}",
         "APP_TIMEZONE": "UTC",
         "CACHE_DRIVER": "redis",
         "SESSION_DRIVER": "redis",
         "QUEUE_CONNECTION": "redis",
+        "TRUSTED_PROXIES": proxy_ip,
         "DB_HOST": "127.0.0.1",
         "DB_PORT": "3306",
         "DB_DATABASE": "panel",
@@ -867,7 +900,7 @@ def write_site_conf(webserver: str) -> int:
     return run(["systemctl", "reload", webserver])
 
 
-def install_panel(state: ServerInstallState) -> int:
+def install_panel(state: ServerInstallState, public_domain: str, proxy_ip: str) -> int:
     """Full getting-started install. Skips steps already done. Returns 0 on success."""
     if shutil.which("composer"):
         warn_skip("composer", state)
@@ -902,14 +935,22 @@ def install_panel(state: ServerInstallState) -> int:
         return 1
 
     env_file = PANEL_DIR / ".env"
-    if env_file.is_file() and f"DB_PASSWORD={db_password}" in env_file.read_text():
+    expected_url = f"APP_URL=https://{public_domain}"
+    env_ok = (
+        env_file.is_file()
+        and f"DB_PASSWORD={db_password}" in env_file.read_text()
+        and expected_url in env_file.read_text()
+        and f"TRUSTED_PROXIES={proxy_ip}" in env_file.read_text()
+    )
+    if env_ok:
         warn_skip("environment file", state)
     else:
-        rc = write_env(db_password)
+        rc = write_env(db_password, public_domain, proxy_ip)
         if rc != 0:
             state.record("environment file", "failed")
             return rc
         state.record("environment file", "done")
+        run([PHP_BIN, "artisan", "config:clear"], cwd=PANEL_DIR)
 
     if (PANEL_DIR / "vendor" / "autoload.php").is_file():
         warn_skip("composer install", state)
@@ -980,12 +1021,35 @@ def main() -> int:
         metavar="EMAIL",
         help="Valid email for the panel admin (required; admin@localhost is rejected)",
     )
+    parser.add_argument(
+        "--public-domain",
+        required=True,
+        metavar="DOMAIN",
+        help="Base public domain (sets APP_URL; mc. and panel. are added only on the proxy)",
+    )
+    parser.add_argument(
+        "--proxy-ip",
+        required=True,
+        metavar="IP",
+        help="Public IPv4 of the proxy (written as TRUSTED_PROXIES; not *)",
+    )
     args = parser.parse_args()
 
     mode = "vanilla" if args.vanilla else "blightfall"
     if not is_valid_email(args.admin_email):
         echo0(f"Error: --admin-email must be a valid email address, got: {args.admin_email!r}")
-        echo0("Example: sudo python3 install-pterodactyl-instead.py --vanilla --admin-email you@example.com")
+        echo0("Example: sudo python3 install-pterodactyl-instead.py --vanilla --admin-email you@example.com --public-domain example.com --proxy-ip 203.0.113.10")
+        return 1
+    if not nomcproxy.is_ipv4(args.proxy_ip):
+        echo0(f"Error: --proxy-ip must be an IPv4 address, got: {args.proxy_ip!r}")
+        return 1
+    if not nomcproxy.is_wan_hostname(args.public_domain):
+        echo0(f"Error: --public-domain must be a hostname, got: {args.public_domain!r}")
+        return 1
+    try:
+        nomcproxy.derive_public_names(args.public_domain)
+    except ValueError as e:
+        echo0(str(e))
         return 1
 
     state = ServerInstallState()
@@ -1023,11 +1087,12 @@ def main() -> int:
 
         # install_panel skips steps that are already done (panel files, DB, etc.)
         # and still creates the admin user if it was never validated.
-        rc = install_panel(state)
+        rc = install_panel(state, args.public_domain, args.proxy_ip)
         if rc != 0:
             return rc
 
         print_egg_instructions(mode)
+        print_node_fqdn(args.public_domain)
         print_port_forward_instructions()
         nomcproxy.print_firewall_instructions(
             [
@@ -1044,9 +1109,8 @@ def main() -> int:
         print("Next step on the public proxy")
         print("=" * 60)
         print("On the VPS that runs nomcproxy, re-run the installer with --pterodactyl:")
-        print("  sudo python3 install.py --dynamic <your-home-dynamic-hostname> --pterodactyl")
-        print("  # or")
-        print("  sudo python3 install.py --static <home-ip> --pterodactyl")
+        print("  sudo python3 install.py --host <home-hostname-or-ip> \\")
+        print("    --pterodactyl --pterodactyl-domain <base-domain>")
         print()
         print("That makes the proxy listen on the typical HTTPS port and forward")
         print(f"to this machine's port {PANEL_PORT}. You and players then use only")
