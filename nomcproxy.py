@@ -19,10 +19,14 @@ from pathlib import Path
 
 CONF_NAME = "nomcproxy-minecraft.conf"
 PANEL_CONF_NAME = "nomcproxy-pterodactyl.conf"
+WINGS_CONF_NAME = "nomcproxy-wings.conf"
+SFTP_CONF_NAME = "nomcproxy-sftp.conf"
 LISTEN_PORT = 25565
 BACKEND_PORT = 25565
+WINGS_PORT = 8080
+SFTP_PORT = 2022
 RESOLVERS = "1.1.1.1 8.8.8.8"
-LOG_FILE_PATH_PATH = Path("/var/log/nomcproxy.log")
+LOG_FILE_PATH = Path("/var/log/nomcproxy.log")
 
 # Pterodactyl panel: home listens on an atypical port. The public proxy
 # exposes it as an HTTP virtual host on 443 for a specific domain, so it
@@ -194,7 +198,59 @@ def is_service_active(service: str) -> bool:
         return False
 
 
-def detect_firewall() -> str | None:
+def tcp_open(host: str, port: int, timeout: float = 3.0) -> bool:
+    """True if a TCP connection to host:port succeeds."""
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
+def looks_like_pterodactyl(host: str, port: int, timeout: float = 5.0) -> str:
+    """Return 'closed', 'pterodactyl', or 'other' for an HTTP panel port."""
+    if not tcp_open(host, port, timeout):
+        return "closed"
+    try:
+        req = urllib.request.Request(
+            f"http://{host}:{port}/",
+            headers={"User-Agent": "nomcproxy/1.0"},
+        )
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            body = resp.read(8192).decode("utf-8", errors="ignore").lower()
+        if "pterodactyl" in body:
+            return "pterodactyl"
+        return "other"
+    except Exception:
+        return "other"
+
+
+def firewall_hint(ports: list[tuple[int, str, str]]) -> list[str]:
+    """Commands or config notes for the firewall that is actually running.
+
+    Returns nothing if no known firewall service is running.
+    """
+    fw = detect_firewall()
+    if not fw:
+        return []
+    lines = [f"A firewall is running on this machine: {fw}."]
+    if fw == "ufw":
+        lines.append("Status:  sudo ufw status")
+        for port, proto, desc in ports:
+            lines.append(f"Allow:   sudo ufw allow {port}/{proto}   # {desc}")
+    elif fw == "firewalld":
+        lines.append("Status:  sudo firewall-cmd --list-ports")
+        for port, proto, desc in ports:
+            lines.append(
+                f"Allow:   sudo firewall-cmd --permanent --add-port={port}/{proto}   # {desc}"
+            )
+        lines.append("Then:    sudo firewall-cmd --reload")
+    else:
+        lines.append("Rules file is usually /etc/nftables.conf.")
+        lines.append("Add accept rules for these ports, then: sudo nft -f /etc/nftables.conf")
+        for port, proto, desc in ports:
+            lines.append(f"  tcp dport {port} accept   # {desc} ({proto})")
+    return lines
     """Return the name of a running firewall service, or None."""
     for name in ("ufw", "firewalld", "nftables"):
         if is_service_active(name):
@@ -370,13 +426,14 @@ def ensure_stream_include(service: str) -> None:
 
 
 def other_stream_files(service: str) -> list[Path]:
-    """Files in stream.d other than the one we wrote."""
+    """Files in stream.d other than the ones nomcproxy wrote."""
+    ours = {CONF_NAME, WINGS_CONF_NAME, SFTP_CONF_NAME}
     conf_dir_path = minecraft_conf_dir(service)
     if not conf_dir_path.is_dir():
         return []
     return sorted(
         p for p in conf_dir_path.iterdir()
-        if p.is_file() and p.name != CONF_NAME
+        if p.is_file() and p.name not in ours
     )
 
 
@@ -385,31 +442,44 @@ def extract_ip(content: str) -> str | None:
     return match.group(1) if match else None
 
 
-def make_minecraft_conf(upstream: str, dynamic: bool, comment: str = "") -> str:
-    """Minecraft TCP proxy. Dynamic hostnames are re-resolved; no cron rewrite."""
+def make_stream_conf(
+    upstream: str,
+    listen_port: int,
+    backend_port: int,
+    role: str,
+    dynamic: bool,
+    comment: str = "",
+) -> str:
+    """TCP proxy. Dynamic hostnames are re-resolved; no cron rewrite."""
     header = "# Managed by nomcproxy — do not edit by hand\n"
-    header += "# role: minecraft\n"
+    header += f"# role: {role}\n"
     if comment:
         header += f"# {comment}\n"
+    var = re.sub(r"[^A-Za-z0-9]", "_", role)
     if dynamic:
         body = f"""    resolver {RESOLVERS} valid=30s;
     server {{
-        listen {LISTEN_PORT};
-        set $mc_upstream {upstream};
-        proxy_pass $mc_upstream:{BACKEND_PORT};
+        listen {listen_port};
+        set ${var}_upstream {upstream};
+        proxy_pass ${var}_upstream:{backend_port};
         proxy_timeout 10m;
         proxy_connect_timeout 5s;
     }}
 """
     else:
         body = f"""    server {{
-        listen {LISTEN_PORT};
-        proxy_pass {upstream}:{BACKEND_PORT};
+        listen {listen_port};
+        proxy_pass {upstream}:{backend_port};
         proxy_timeout 10m;
         proxy_connect_timeout 5s;
     }}
 """
     return f"{header}{body}"
+
+
+def make_minecraft_conf(upstream: str, dynamic: bool, comment: str = "") -> str:
+    """Minecraft TCP proxy."""
+    return make_stream_conf(upstream, LISTEN_PORT, BACKEND_PORT, "minecraft", dynamic, comment)
 
 
 def panel_conf_dir(service: str) -> Path:
@@ -538,11 +608,11 @@ def ensure_dummy_site(apex: str) -> None:
     log.info("Wrote placeholder %s", site_path / "index.php")
 
 
-def cname_warnings(apex: str, mc_host: str, panel_host: str) -> list[str]:
+def cname_warnings(apex: str, *hosts: str) -> list[str]:
     """Names that do not resolve to this proxy's WAN IP."""
     wan = get_wan_ip()
     missing = []
-    for host in (mc_host, panel_host):
+    for host in hosts:
         try:
             ip = resolve_ip(host)
         except Exception:
@@ -565,14 +635,30 @@ def write_panel_conf(upstream: str, domain: str, service: str, dynamic: bool) ->
     return path
 
 
-def write_minecraft_conf(upstream: str, service: str, dynamic: bool, comment: str = "") -> Path:
-    ensure_stream_include(service)
+def write_stream_conf(
+    upstream: str,
+    service: str,
+    dynamic: bool,
+    name: str,
+    listen_port: int,
+    backend_port: int,
+    role: str,
+    comment: str = "",
+) -> Path:
     conf_dir_path = minecraft_conf_dir(service)
     conf_dir_path.mkdir(parents=True, exist_ok=True)
-    path = conf_dir_path / CONF_NAME
-    path.write_text(make_minecraft_conf(upstream, dynamic, comment))
+    path = conf_dir_path / name
+    path.write_text(make_stream_conf(upstream, listen_port, backend_port, role, dynamic, comment))
     os.chmod(path, 0o644)
-    log.info("Wrote minecraft stream %s → %s:%s", path, upstream, BACKEND_PORT)
+    log.info("Wrote %s stream %s → %s:%s", role, path, upstream, backend_port)
+    return path
+
+
+def write_minecraft_conf(upstream: str, service: str, dynamic: bool, comment: str = "") -> Path:
+    ensure_stream_include(service)
+    path = write_stream_conf(
+        upstream, service, dynamic, CONF_NAME, LISTEN_PORT, BACKEND_PORT, "minecraft", comment
+    )
     for old_path in (
         Path("/etc/angie/conf.d/nomcproxy.conf"),
         Path("/etc/nginx/conf.d/nomcproxy.conf"),
@@ -648,6 +734,12 @@ def write_conf(upstream: str, comment: str = "", panel_domain: str | None = None
     conf_path = write_minecraft_conf(upstream, service, dynamic, comment)
     if panel_domain:
         write_panel_conf(upstream, panel_domain, service, dynamic)
+        write_stream_conf(
+            upstream, service, dynamic, WINGS_CONF_NAME, WINGS_PORT, WINGS_PORT, "wings", comment
+        )
+        write_stream_conf(
+            upstream, service, dynamic, SFTP_CONF_NAME, SFTP_PORT, SFTP_PORT, "sftp", comment
+        )
     return conf_path, service
 
 

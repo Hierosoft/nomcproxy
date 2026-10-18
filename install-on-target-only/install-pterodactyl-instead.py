@@ -341,42 +341,84 @@ def print_port_forward_instructions() -> None:
     print("  - If you allocate a different port in the panel, forward that port instead")
     print("    and update the nomcproxy backend port to match.")
     print()
-    print("After the proxy is configured with --pterodactyl, players and you")
-    print("reach everything via the public proxy address only:")
-    print(f"  Minecraft:  <public-proxy-ip-or-domain>:{MINECRAFT_PORT}")
-    print(f"  Panel:      https://<public-proxy-ip-or-domain>  (port {PROXY_PORT})")
-    print("The home IP and dynamic hostname are never given out.")
+    print("Do not publish this machine's address or these ports.")
+    print("Public DNS, the node FQDN, and the links to give out are")
+    print("printed by install.py on the public proxy.")
 
 
 def print_node_fqdn(apex: str) -> None:
-    """Tell the user the exact Node FQDN to enter in the panel.
+    """Short note. The full public guide is printed by the proxy installer."""
+    print()
+    print("=" * 60)
+    print("Pterodactyl node")
+    print("=" * 60)
+    print("Do not enter this machine's IP or dynamic hostname as the node FQDN.")
+    print("The public proxy installer prints the FQDN, location name, and")
+    print("node name to use. Create the node only after that name resolves.")
+    print("=" * 60)
 
-    The subdomain exists only as DNS on the public proxy, not on this machine.
-    """
-    node = "node." + apex
+
+def print_proxy_next_steps(proxy_ip: str, public_domain: str) -> None:
+    """Friendly check of the public proxy from the home server."""
     print()
     print("=" * 60)
-    print("Pterodactyl Node FQDN")
+    print("Next steps (checked from this home server)")
     print("=" * 60)
-    print("When creating the node, the FQDN field says:")
-    print("  Please enter domain name (e.g node.example.com) to be used for")
-    print("  connecting to the daemon. An IP address may be used only if you")
-    print("  are not using SSL for this node.")
-    print()
-    print(f"Set FQDN to: {node}")
-    print()
-    print("That name is DNS on the public proxy, not a vhost on this machine.")
-    print("It is how the panel and your browser reach Wings (port 8080),")
-    print("not how players join Minecraft.")
-    print("  Do not use the home IP or the dynamic hostname.")
-    print(f"  Do not use {apex} (that is the base domain).")
-    print(f"  Do not use panel.{apex} (that is the panel, on the proxy).")
-    print(f"  Do not use mc.{apex} (that is the Minecraft stream on 25565).")
-    print("An IP is only valid if this node will not use SSL, and it must not")
-    print("be the home address.")
-    print()
-    print(f'On the proxy DNS, add:  node  CNAME  "{apex}."')
-    print("Then proxy TCP 8080 on the VPS to this machine's port 8080.")
+    checks = [
+        (proxy_ip, 25565, "Minecraft"),
+        (proxy_ip, 443, "panel HTTPS"),
+        (proxy_ip, 8080, "Wings"),
+        (proxy_ip, 2022, "SFTP"),
+    ]
+    closed = []
+    for host, port, desc in checks:
+        if nomcproxy.tcp_open(host, port):
+            print(f"{desc} on {host}:{port} is accepting connections.")
+        else:
+            print(f"{desc} on {host}:{port} is not responding yet.")
+            closed.append(f"{port}/tcp ({desc})")
+    try:
+        apex, mc_host, panel_host = nomcproxy.derive_public_names(public_domain)
+    except ValueError:
+        apex, mc_host, panel_host = public_domain, "", ""
+    if mc_host:
+        for host in (mc_host, panel_host, "node." + apex):
+            try:
+                ip = nomcproxy.resolve_ip(host)
+            except Exception:
+                ip = None
+            if ip == proxy_ip:
+                print(f"{host} resolves to the proxy.")
+            else:
+                print(f"{host} does not resolve to {proxy_ip} yet.")
+                print(f'  Add a CNAME:  {host.split(".")[0]}  CNAME  "{apex}."')
+                print("  Propagation can take up to 72 hours.")
+    if closed:
+        print()
+        print("On the public proxy VPS, run:")
+        print("  sudo python3 install.py --target-server <this-home-host> \\")
+        print(f"    --pterodactyl --pterodactyl-domain {public_domain}")
+        print("and open these on whatever firewall is running there:")
+        for item in closed:
+            print(f"  {item}")
+    hints = nomcproxy.firewall_hint(
+        [
+            (PANEL_PORT, "tcp", "panel"),
+            (MINECRAFT_PORT, "tcp", "Minecraft"),
+            (WINGS_API_PORT, "tcp", "Wings"),
+            (WINGS_SFTP_PORT, "tcp", "SFTP"),
+        ]
+    )
+    if hints:
+        print()
+        print("On this home server:")
+        for line in hints:
+            print(f"  {line}")
+    else:
+        print()
+        print("No software firewall is running on this home server")
+        print("(checked ufw, firewalld, nftables).")
+    print("Forward 25565, 8443, 8080, and 2022 TCP on the home router.")
     print("=" * 60)
 
 
@@ -1152,12 +1194,10 @@ def main() -> int:
         print("    --pterodactyl --pterodactyl-domain <base-domain>")
         print()
         print("That makes the proxy listen on the typical HTTPS port and forward")
-        print(f"to this machine's port {PANEL_PORT}. You and players then use only")
-        print("the public proxy domain/IP; the home IP and dynamic hostname stay hidden.")
-        print()
-        print("Access after the proxy is configured:")
-        print(f"  Panel:     https://<public-proxy-domain-or-ip>")
-        print(f"  Minecraft: <public-proxy-domain-or-ip>:{MINECRAFT_PORT}")
+        print(f"to this machine's port {PANEL_PORT}. The proxy installer prints")
+        print("the DNS records and the public links. Do not publish this")
+        print("machine's address.")
+        print_proxy_next_steps(args.proxy_ip, args.public_domain)
         return 0
     finally:
         state.print_summary()

@@ -128,7 +128,29 @@ chmod +x install-and-run-java-latest-mc.py install-and-run-java8-blightfall.py
 
 See `install-on-target-only/server.md` for the private-server notes.
 
-### Optional: Pterodactyl on the private server
+## Pterodactyl
+
+The panel is an admin tool for the people who run the servers. Joining
+Minecraft does not use a panel account. Players connect to
+`mc.<domain>:25565` with the game client.
+
+A panel login is for the owner and anyone you add as a subuser:
+
+- Live console, and commands if you allow them.
+- Start, stop, and restart the server.
+- File manager for configs, mods, and worlds.
+- SFTP on port 2022 for bulk uploads (the proxy forwards this).
+- Backups, schedules, and databases.
+- Subusers with limited permissions, so a helper can use the console
+  without getting your password.
+
+Admin work (nodes, locations, creating servers, eggs) is at
+`https://panel.<domain>/admin`. The root `https://panel.<domain>` is the
+same app's login and user side. The apex domain stays free for a normal
+website.
+
+The panel itself runs on the home server, on port 8443. The public proxy
+exposes it as `https://panel.<domain>`. Do not publish the home address.
 
 Instead of a plain jar you can run Pterodactyl on the home machine:
 
