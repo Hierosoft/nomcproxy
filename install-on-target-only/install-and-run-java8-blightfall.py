@@ -43,11 +43,11 @@ def refuse_if_proxy() -> None:
     print("  - Do not install Minecraft here if nomcproxy.conf is present.", file=sys.stderr)
     sys.exit(1)
 
-INSTALL_ROOT = Path("/opt/minecraft")
-SERVER_DIR = INSTALL_ROOT / "1.7.10-blightfall"
-LIST_FILE = INSTALL_ROOT / "nomcproxy.list"
-SERVER_MD_SRC = Path(TARGET_SCRIPTS_DIR) / "server.md"
-SERVER_MD_DST = INSTALL_ROOT / "server.md"
+INSTALL_ROOT_PATH = Path("/opt/minecraft")
+SERVER_DIR_PATH = INSTALL_ROOT_PATH / "1.7.10-blightfall"
+LIST_FILE_PATH = INSTALL_ROOT_PATH / "nomcproxy.list"
+SERVER_MD_SRC_PATH = Path(TARGET_SCRIPTS_DIR) / "server.md"
+SERVER_MD_DST_PATH = INSTALL_ROOT_PATH / "server.md"
 ENTRY_NAME = "1.7.10-blightfall"
 
 BLIGHTFALL_VERSION = os.environ.get("BLIGHTFALL_VERSION", "3.1.1-CE")
@@ -68,9 +68,9 @@ def ensure_corretto() -> str:
             "Automatic Corretto install is only scripted for apt-based systems.\n"
             "Install Amazon Corretto 8 manually, then re-run."
         )
-    keyring = Path("/usr/share/keyrings/corretto-keyring.gpg")
-    list_file = Path("/etc/apt/sources.list.d/corretto.list")
-    if not list_file.exists():
+    keyring_path = Path("/usr/share/keyrings/corretto-keyring.gpg")
+    list_file_path = Path("/etc/apt/sources.list.d/corretto.list")
+    if not list_file_path.exists():
         subprocess.run(
             "wget -qO- https://apt.corretto.aws/corretto.key | "
             "sudo gpg --dearmor -o /usr/share/keyrings/corretto-keyring.gpg",
@@ -78,7 +78,7 @@ def ensure_corretto() -> str:
             check=True,
         )
         subprocess.run(
-            ["sudo", "tee", str(list_file)],
+            ["sudo", "tee", str(list_file_path)],
             input=(
                 "deb [signed-by=/usr/share/keyrings/corretto-keyring.gpg] "
                 "https://apt.corretto.aws stable main\n"
@@ -96,57 +96,57 @@ def ensure_corretto() -> str:
     return CORRETTO_JAVA
 
 
-def find_server_jar(server_dir: Path) -> Path | None:
+def find_server_jar(server_dir_path: Path) -> Path | None:
     for pattern in ("Blightfall.jar", "forge-*-universal.jar", "minecraft_server.1.7.10.jar"):
-        matches = list(server_dir.glob(pattern))
+        matches = list(server_dir_path.glob(pattern))
         if matches:
             return matches[0]
     return None
 
 
-def download_blightfall(server_dir: Path) -> None:
-    if find_server_jar(server_dir):
+def download_blightfall(server_dir_path: Path) -> None:
+    if find_server_jar(server_dir_path):
         print("Blightfall server files already present.")
         return
     print(f"Downloading Blightfall server pack {BLIGHTFALL_VERSION}...")
-    server_dir.mkdir(parents=True, exist_ok=True)
+    server_dir_path.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as tmp:
         tmp_path = Path(tmp.name)
     try:
         urllib.request.urlretrieve(BLIGHTFALL_ZIP_URL, tmp_path)
         with zipfile.ZipFile(tmp_path) as zf:
-            zf.extractall(server_dir)
+            zf.extractall(server_dir_path)
         print("Unpacked Blightfall server files.")
     except Exception as e:
         sys.exit(
             f"Failed to download or unpack Blightfall from:\n  {BLIGHTFALL_ZIP_URL}\n"
-            f"{e}\nDownload the server zip manually into {server_dir} and re-run."
+            f"{e}\nDownload the server zip manually into {server_dir_path} and re-run."
         )
     finally:
         tmp_path.unlink(missing_ok=True)
 
 
 def update_list(entry: str) -> None:
-    INSTALL_ROOT.mkdir(parents=True, exist_ok=True)
+    INSTALL_ROOT_PATH.mkdir(parents=True, exist_ok=True)
     existing = set()
-    if LIST_FILE.exists():
-        existing = {line.strip() for line in LIST_FILE.read_text().splitlines() if line.strip()}
+    if LIST_FILE_PATH.exists():
+        existing = {line.strip() for line in LIST_FILE_PATH.read_text().splitlines() if line.strip()}
     if entry not in existing:
         existing.add(entry)
-        LIST_FILE.write_text("\n".join(sorted(existing)) + "\n")
-        print(f"Recorded {entry} in {LIST_FILE}")
+        LIST_FILE_PATH.write_text("\n".join(sorted(existing)) + "\n")
+        print(f"Recorded {entry} in {LIST_FILE_PATH}")
 
 
 def copy_server_md() -> None:
-    if SERVER_MD_SRC.is_file():
-        shutil.copy2(SERVER_MD_SRC, SERVER_MD_DST)
-        print(f"Copied server.md to {SERVER_MD_DST}")
+    if SERVER_MD_SRC_PATH.is_file():
+        shutil.copy2(SERVER_MD_SRC_PATH, SERVER_MD_DST_PATH)
+        print(f"Copied server.md to {SERVER_MD_DST_PATH}")
 
 
 def write_desktop_shortcut() -> None:
-    desktop_dir = Path.home() / ".local" / "share" / "applications"
-    desktop_dir.mkdir(parents=True, exist_ok=True)
-    desktop_file = desktop_dir / "nomcproxy-repo.desktop"
+    desktop_dir_path = Path.home() / ".local" / "share" / "applications"
+    desktop_dir_path.mkdir(parents=True, exist_ok=True)
+    desktop_file_path = desktop_dir_path / "nomcproxy-repo.desktop"
     content = f"""[Desktop Entry]
 Type=Application
 Name=nomcproxy repository
@@ -156,30 +156,30 @@ Icon=folder
 Terminal=false
 Categories=Development;
 """
-    desktop_file.write_text(content)
-    desktop_file.chmod(0o755)
-    print(f"Created desktop shortcut: {desktop_file}")
+    desktop_file_path.write_text(content)
+    desktop_file_path.chmod(0o755)
+    print(f"Created desktop shortcut: {desktop_file_path}")
 
 
 def main() -> None:
     refuse_if_proxy()
     java = ensure_corretto()
-    SERVER_DIR.mkdir(parents=True, exist_ok=True)
-    download_blightfall(SERVER_DIR)
-    jar = find_server_jar(SERVER_DIR)
-    if jar is None:
-        sys.exit(f"No Blightfall/Forge server jar found in {SERVER_DIR}")
+    SERVER_DIR_PATH.mkdir(parents=True, exist_ok=True)
+    download_blightfall(SERVER_DIR_PATH)
+    jar_path = find_server_jar(SERVER_DIR_PATH)
+    if jar_path is None:
+        sys.exit(f"No Blightfall/Forge server jar found in {SERVER_DIR_PATH}")
 
     update_list(ENTRY_NAME)
     copy_server_md()
     write_desktop_shortcut()
 
-    print(f"Starting Blightfall with {jar}")
+    print(f"Starting Blightfall with {jar_path}")
     nomcproxy.print_firewall_instructions(
         [(25565, "tcp", "Minecraft (Java uses TCP)")],
         behind_router=True,
     )
-    os.chdir(SERVER_DIR)
+    os.chdir(SERVER_DIR_PATH)
     os.execvp(
         java,
         [
@@ -190,7 +190,7 @@ def main() -> None:
             "-XX:MaxGCPauseMillis=100",
             "-XX:+DisableExplicitGC",
             "-jar",
-            str(jar),
+            str(jar_path),
             "nogui",
         ],
     )

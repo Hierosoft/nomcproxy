@@ -3,7 +3,8 @@
 Reusable Python module and installer for an nginx/Angie reverse proxy
 that hides a home server's IP.
 
-`--host` accepts a hostname or an IPv4 address. Hostnames are re-resolved
+`--target-server` accepts a hostname or an IPv4 address of the private
+Minecraft server. Hostnames are re-resolved by Angie/nginx.
 by Angie/nginx (resolver + variable). No cron job.
 
 ## Layout
@@ -11,7 +12,7 @@ by Angie/nginx (resolver + variable). No cron job.
 ```
 nomcproxy/
   nomcproxy.py              # reusable module
-  install.py                # installer (--host)
+  install.py                # installer (--target-server)
   README.md
   AGENTS.md
   install-on-target-only/   # Python scripts for the home Minecraft server only
@@ -34,10 +35,10 @@ Must be run as root from the `nomcproxy` directory (or with the files present).
 ### Host
 
 ```bash
-sudo python3 install.py --host myhost.example.net
-sudo python3 install.py --host myhost.example.net \
+sudo python3 install.py --target-server myhost.example.net
+sudo python3 install.py --target-server myhost.example.net \
   --pterodactyl --pterodactyl-domain play.example.com
-sudo python3 install.py --host 203.0.113.42 \
+sudo python3 install.py --target-server 203.0.113.42 \
   --pterodactyl --pterodactyl-domain play.example.com
 ```
 
@@ -58,15 +59,15 @@ stream {
 (`/etc/angie/http.d/nomcproxy-pterodactyl.conf`) and requires
 `--pterodactyl-domain`. That domain must point at this proxy.
 
-Rejected if `--host` is this server's own WAN IP.
+Rejected if `--target-server` is this server's own WAN IP.
 
 ## Module API
 
 ```python
 import nomcproxy
 
-nomcproxy.apply_host("myhost.example.net")
-nomcproxy.apply_host("203.0.113.42", panel_domain="play.example.com")
+nomcproxy.apply_target_server("myhost.example.net")
+nomcproxy.apply_target_server("203.0.113.42", panel_domain="play.example.com")
 ```
 
 ## Checking logs

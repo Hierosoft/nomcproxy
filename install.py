@@ -3,29 +3,31 @@
 Installer for nomcproxy.
 
 Usage:
-  sudo python3 install.py --host example.dyndns.org [--pterodactyl --pterodactyl-domain play.example.com]
-  sudo python3 install.py --host 203.0.113.42 [--pterodactyl --pterodactyl-domain play.example.com]
+  sudo python3 install.py --target-server TARGET [--pterodactyl --pterodactyl-domain DOMAIN]
 
---host                Hostname or IPv4 of the private server. Hostnames are
-                      re-resolved by Angie/nginx (resolver + variable).
+--target-server       Hostname or IPv4 of the private Minecraft server.
+                      Hostnames are re-resolved by Angie/nginx.
 --pterodactyl         Also reverse-proxy the Pterodactyl panel as an HTTP
                       virtual host. Requires --pterodactyl-domain.
---pterodactyl-domain  Public domain for the panel (and Minecraft).
+--pterodactyl-domain  Base public domain. mc. and panel. are added here.
                       Must point at this proxy, not the home server.
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
+from collections import OrderedDict
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import nomcproxy
 
-PRIVATE_SERVER_MD = Path("/opt/minecraft/server.md")
-OLD_CRON = Path("/etc/cron.d/nomcproxy")
+PRIVATE_SERVER_MD_PATH = Path("/opt/minecraft/server.md")
+OLD_CRON_PATH = Path("/etc/cron.d/nomcproxy")
+SETTINGS_PATH = Path("/etc/nomcproxy/settings.json")
 
 
 def explain_and_refuse(reason: str) -> int:
@@ -43,9 +45,9 @@ def explain_and_refuse(reason: str) -> int:
 
 def check_opposing_markers() -> int | None:
     """Refuse if private-server markers are present. Proxy confs are allowed."""
-    if PRIVATE_SERVER_MD.is_file():
+    if PRIVATE_SERVER_MD_PATH.is_file():
         return explain_and_refuse(
-            f"{PRIVATE_SERVER_MD} exists — this is the private server"
+            f"{PRIVATE_SERVER_MD_PATH} exists — this is the private server"
         )
     return None
 
@@ -53,6 +55,36 @@ def check_opposing_markers() -> int | None:
 def echo0(*args, **kwargs) -> None:
     kwargs['file'] = sys.stderr
     print(*args, **kwargs)
+
+
+def load_settings() -> OrderedDict:
+    if not SETTINGS_PATH.is_file():
+        return OrderedDict()
+    try:
+        return json.loads(SETTINGS_PATH.read_text(), object_pairs_hook=OrderedDict)
+    except (OSError, json.JSONDecodeError):
+        return OrderedDict()
+
+
+def save_settings(data: dict) -> None:
+    ordered = OrderedDict(data)
+    SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    SETTINGS_PATH.write_text(json.dumps(ordered, indent=2) + "\n")
+    os.chmod(SETTINGS_PATH, 0o600)
+
+
+def example_from_settings() -> str:
+    saved = load_settings()
+    target = saved.get("target_server")
+    if not target:
+        return ""
+    parts = ["sudo python3 install.py", f"--target-server {target}"]
+    if saved.get("pterodactyl"):
+        parts.append("--pterodactyl")
+    domain = saved.get("pterodactyl_domain")
+    if domain:
+        parts.append(f"--pterodactyl-domain {domain}")
+    return "Example:\n  " + " ".join(parts)
 
 
 def main() -> int:
@@ -64,12 +96,16 @@ def main() -> int:
     if refused is not None:
         return refused
 
-    parser = argparse.ArgumentParser(description="Install nomcproxy configuration")
+    parser = argparse.ArgumentParser(
+        description="Install nomcproxy configuration",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=example_from_settings(),
+    )
     parser.add_argument(
-        "--host",
+        "--target-server",
         required=True,
-        metavar="HOST",
-        help="Hostname or IPv4 of the private server",
+        metavar="TARGET",
+        help="Hostname or IPv4 of the private Minecraft server",
     )
     parser.add_argument(
         "--pterodactyl",
@@ -82,6 +118,11 @@ def main() -> int:
         help="Public domain for the panel and Minecraft (required with --pterodactyl)",
     )
     args = parser.parse_args()
+    save_settings({
+        "target_server": args.target_server,
+        "pterodactyl": bool(args.pterodactyl),
+        "pterodactyl_domain": args.pterodactyl_domain or "",
+    })
 
     if args.pterodactyl and not args.pterodactyl_domain:
         echo0("Error: --pterodactyl requires --pterodactyl-domain DOMAIN")
@@ -107,14 +148,14 @@ def main() -> int:
         )
         print("The home IP and dynamic hostname stay hidden.")
 
-    if OLD_CRON.is_file():
-        OLD_CRON.unlink()
-        print(f"Removed obsolete cron job: {OLD_CRON}")
+    if OLD_CRON_PATH.is_file():
+        OLD_CRON_PATH.unlink()
+        print(f"Removed obsolete cron job: {OLD_CRON_PATH}")
 
     try:
         panel = names[2] if names else None
-        service = nomcproxy.apply_host(args.host, panel_domain=panel)
-        print(f"Configuration applied for {args.host}")
+        service = nomcproxy.apply_target_server(args.target_server, panel_domain=panel)
+        print(f"Configuration applied for {args.target_server}")
         if names:
             nomcproxy.ensure_dummy_site(names[0])
     except Exception as e:

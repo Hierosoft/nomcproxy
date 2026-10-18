@@ -661,3 +661,9 @@ Remove all traces of MultiLabelZ from your memory in this Grok project including
 We don't want subdomains on the target only the proxy.
 
 explain if removing the "--public-domain" was ok--do we not need to know the public domain when setting up the server (which may have a private/dynamic domain or IP)?
+
+Rename host to target host in arg and variables wherever it refers to the target server with Minecraft on it. Whenever running install on server or host, save the args to settings json so that if we show the usage screen, we can show "Example:" command containing the real values (but still keep the "Usage" part of the help above that having placeholders like typical CLI help screen).
+
+Actually, rename target host to target server for further clarity.
+
+Always save and load json using OrderedDict. Rename any variables (or constants by convention of all caps) that are Pathlib path objects to end with `path` (or `_PATH` if all caps, `Path` if Pascal or camel case, or whatever is consistent case style with the original). Rename any variables that are str but contain a path to end with either "file" or "dir" (except args, leave those alone), following same case style as original name.

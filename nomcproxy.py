@@ -22,14 +22,14 @@ PANEL_CONF_NAME = "nomcproxy-pterodactyl.conf"
 LISTEN_PORT = 25565
 BACKEND_PORT = 25565
 RESOLVERS = "1.1.1.1 8.8.8.8"
-LOG_FILE = Path("/var/log/nomcproxy.log")
+LOG_FILE_PATH_PATH = Path("/var/log/nomcproxy.log")
 
 # Pterodactyl panel: home listens on an atypical port. The public proxy
 # exposes it as an HTTP virtual host on 443 for a specific domain, so it
 # does not steal 443 from other sites on this VPS.
 PTERODACTYL_PRIVATE_PORT = 8443
 PTERODACTYL_PROXY_PORT = 443
-PTERODACTYL_MARKER = Path("/etc/nomcproxy/enable-pterodactyl")
+PTERODACTYL_MARKER_PATH = Path("/etc/nomcproxy/enable-pterodactyl")
 
 # Known dynamic-DNS provider domain suffixes.
 # An address is considered dynamic if it equals or ends with one of these.
@@ -162,12 +162,12 @@ def setup_logging(name: str = "nomcproxy") -> logging.Logger:
     logger.addHandler(stderr)
 
     try:
-        LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
-        fh = logging.FileHandler(LOG_FILE, encoding="utf-8")
+        LOG_FILE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        fh = logging.FileHandler(LOG_FILE_PATH, encoding="utf-8")
         fh.setFormatter(formatter)
         logger.addHandler(fh)
     except OSError as e:
-        logger.warning("Could not open log file %s: %s", LOG_FILE, e)
+        logger.warning("Could not open log file %s: %s", LOG_FILE_PATH, e)
 
     return logger
 
@@ -312,9 +312,9 @@ def minecraft_conf_dir(service: str) -> Path:
     """Stream include dir. Minecraft is TCP and cannot live in http.d."""
     if service == "angie":
         return Path("/etc/angie/stream.d")
-    stream_d = Path("/etc/nginx/stream.d")
-    if stream_d.is_dir():
-        return stream_d
+    stream_d_path = Path("/etc/nginx/stream.d")
+    if stream_d_path.is_dir():
+        return stream_d_path
     return Path("/etc/nginx/conf.d")
 
 
@@ -332,15 +332,15 @@ def _has_active_stream_block(text: str) -> bool:
 def ensure_stream_include(service: str) -> None:
     """Uncomment the stream.d include, or add it if missing. No-op if already active."""
     if service == "angie":
-        conf = Path("/etc/angie/angie.conf")
+        conf_path = Path("/etc/angie/angie.conf")
         include = "include /etc/angie/stream.d/*.conf;"
     else:
-        conf = Path("/etc/nginx/nginx.conf")
+        conf_path = Path("/etc/nginx/nginx.conf")
         include = "include /etc/nginx/stream.d/*.conf;"
-    if not conf.is_file():
-        log.warning("No %s; cannot enable stream include", conf)
+    if not conf_path.is_file():
+        log.warning("No %s; cannot enable stream include", conf_path)
         return
-    text = conf.read_text()
+    text = conf_path.read_text()
     if _has_active_stream_block(text):
         return
     # Uncomment the standard commented block:
@@ -365,17 +365,17 @@ def ensure_stream_include(service: str) -> None:
     if n == 0:
         new = text.rstrip() + f"\nstream {{\n    {include}\n}}\n"
     if new != text:
-        conf.write_text(new)
-        log.info("Enabled stream include in %s", conf)
+        conf_path.write_text(new)
+        log.info("Enabled stream include in %s", conf_path)
 
 
 def other_stream_files(service: str) -> list[Path]:
     """Files in stream.d other than the one we wrote."""
-    conf_dir = minecraft_conf_dir(service)
-    if not conf_dir.is_dir():
+    conf_dir_path = minecraft_conf_dir(service)
+    if not conf_dir_path.is_dir():
         return []
     return sorted(
-        p for p in conf_dir.iterdir()
+        p for p in conf_dir_path.iterdir()
         if p.is_file() and p.name != CONF_NAME
     )
 
@@ -415,9 +415,9 @@ def make_minecraft_conf(upstream: str, dynamic: bool, comment: str = "") -> str:
 def panel_conf_dir(service: str) -> Path:
     """HTTP include dir. Prefer Angie http.d (inside http {}) when present."""
     if service == "angie":
-        http_d = Path("/etc/angie/http.d")
-        if http_d.is_dir():
-            return http_d
+        http_d_path = Path("/etc/angie/http.d")
+        if http_d_path.is_dir():
+            return http_d_path
         return Path("/etc/angie/conf.d")
     return Path("/etc/nginx/conf.d")
 
@@ -442,8 +442,6 @@ def derive_public_names(domain: str) -> tuple[str, str, str]:
 
 
 def acme_client_name(domain: str) -> str:
-    """Angie acme_client identifier: non-alphanumeric → underscore."""
-    return re.sub(r"[^A-Za-z0-9]", "_", domain)
     """Angie acme_client identifier: non-alphanumeric → underscore."""
     return re.sub(r"[^A-Za-z0-9]", "_", domain)
 
@@ -516,12 +514,12 @@ server {{
 
 def acme_client_defined(name: str) -> bool:
     """True if some http conf already defines this acme_client."""
-    roots = [Path("/etc/angie/http.d"), Path("/etc/angie/conf.d"), Path("/etc/nginx/conf.d")]
+    root_paths = [Path("/etc/angie/http.d"), Path("/etc/angie/conf.d"), Path("/etc/nginx/conf.d")]
     needle = f"acme_client {name}"
-    for root in roots:
-        if not root.is_dir():
+    for root_path in root_paths:
+        if not root_path.is_dir():
             continue
-        for path in root.glob("*.conf"):
+        for path in root_path.glob("*.conf"):
             try:
                 if needle in path.read_text():
                     return True
@@ -532,12 +530,12 @@ def acme_client_defined(name: str) -> bool:
 
 def ensure_dummy_site(apex: str) -> None:
     """Write a placeholder index.php under /var/www/{apex} if that dir is empty."""
-    site = Path("/var/www") / apex
-    site.mkdir(parents=True, exist_ok=True)
-    if any(site.iterdir()):
+    site_path = Path("/var/www") / apex
+    site_path.mkdir(parents=True, exist_ok=True)
+    if any(site_path.iterdir()):
         return
-    (site / "index.php").write_text("<?php echo 'nomcproxy';\n")
-    log.info("Wrote placeholder %s", site / "index.php")
+    (site_path / "index.php").write_text("<?php echo 'nomcproxy';\n")
+    log.info("Wrote placeholder %s", site_path / "index.php")
 
 
 def cname_warnings(apex: str, mc_host: str, panel_host: str) -> list[str]:
@@ -555,19 +553,9 @@ def cname_warnings(apex: str, mc_host: str, panel_host: str) -> list[str]:
 
 
 def write_panel_conf(upstream: str, domain: str, service: str, dynamic: bool) -> Path:
-    conf_dir = panel_conf_dir(service)
-    conf_dir.mkdir(parents=True, exist_ok=True)
-    path = conf_dir / PANEL_CONF_NAME
-    path.write_text(make_panel_conf(upstream, domain, service, dynamic))
-    os.chmod(path, 0o644)
-    log.info(
-        "Wrote panel virtual host %s (server_name %s → %s:%s)",
-        path, domain, upstream, PTERODACTYL_PRIVATE_PORT,
-    )
-    return path
-    conf_dir = panel_conf_dir(service)
-    conf_dir.mkdir(parents=True, exist_ok=True)
-    path = conf_dir / PANEL_CONF_NAME
+    conf_dir_path = panel_conf_dir(service)
+    conf_dir_path.mkdir(parents=True, exist_ok=True)
+    path = conf_dir_path / PANEL_CONF_NAME
     path.write_text(make_panel_conf(upstream, domain, service, dynamic))
     os.chmod(path, 0o644)
     log.info(
@@ -579,19 +567,19 @@ def write_panel_conf(upstream: str, domain: str, service: str, dynamic: bool) ->
 
 def write_minecraft_conf(upstream: str, service: str, dynamic: bool, comment: str = "") -> Path:
     ensure_stream_include(service)
-    conf_dir = minecraft_conf_dir(service)
-    conf_dir.mkdir(parents=True, exist_ok=True)
-    path = conf_dir / CONF_NAME
+    conf_dir_path = minecraft_conf_dir(service)
+    conf_dir_path.mkdir(parents=True, exist_ok=True)
+    path = conf_dir_path / CONF_NAME
     path.write_text(make_minecraft_conf(upstream, dynamic, comment))
     os.chmod(path, 0o644)
     log.info("Wrote minecraft stream %s → %s:%s", path, upstream, BACKEND_PORT)
-    for old in (
+    for old_path in (
         Path("/etc/angie/conf.d/nomcproxy.conf"),
         Path("/etc/nginx/conf.d/nomcproxy.conf"),
     ):
-        if old.is_file():
-            old.unlink()
-            log.info("Removed old conf %s", old)
+        if old_path.is_file():
+            old_path.unlink()
+            log.info("Removed old conf %s", old_path)
     return path
 
 
@@ -621,19 +609,19 @@ def find_proxy_conf() -> Path | None:
 
 def pterodactyl_domain() -> str | None:
     """Domain stored in the marker file, or None if panel proxy is off."""
-    if not PTERODACTYL_MARKER.is_file():
+    if not PTERODACTYL_MARKER_PATH.is_file():
         return None
-    text = PTERODACTYL_MARKER.read_text().strip()
+    text = PTERODACTYL_MARKER_PATH.read_text().strip()
     return text or None
 
 
 def set_pterodactyl_domain(domain: str | None) -> None:
-    PTERODACTYL_MARKER.parent.mkdir(parents=True, exist_ok=True)
+    PTERODACTYL_MARKER_PATH.parent.mkdir(parents=True, exist_ok=True)
     if domain:
-        PTERODACTYL_MARKER.write_text(domain.strip() + "\n")
-        os.chmod(PTERODACTYL_MARKER, 0o644)
-    elif PTERODACTYL_MARKER.exists():
-        PTERODACTYL_MARKER.unlink()
+        PTERODACTYL_MARKER_PATH.write_text(domain.strip() + "\n")
+        os.chmod(PTERODACTYL_MARKER_PATH, 0o644)
+    elif PTERODACTYL_MARKER_PATH.exists():
+        PTERODACTYL_MARKER_PATH.unlink()
 
 
 def pterodactyl_enabled() -> bool:
@@ -663,20 +651,28 @@ def write_conf(upstream: str, comment: str = "", panel_domain: str | None = None
     return conf_path, service
 
 
-def apply_host(host: str, panel_domain: str | None = None) -> str:
-    """Write confs for a hostname or IP. Hostnames are re-resolved by the web server."""
-    dynamic = not is_ipv4(host)
+def apply_target_server(target_server: str, panel_domain: str | None = None) -> str:
+    """Write confs for the Minecraft server's hostname or IP.
+
+    Hostnames are re-resolved by the web server.
+    """
+    dynamic = not is_ipv4(target_server)
     if dynamic:
-        if not is_wan_hostname(host):
-            raise ValueError(f"--host must be a hostname or IPv4 address, got: {host!r}")
-        ip = resolve_ip(host)
-        assert_not_self(ip, f"host {host}")
+        if not is_wan_hostname(target_server):
+            raise ValueError(
+                f"--target-server must be a hostname or IPv4 address, got: {target_server!r}"
+            )
+        ip = resolve_ip(target_server)
+        assert_not_self(ip, f"target server {target_server}")
     else:
-        assert_not_self(host, "host")
+        assert_not_self(target_server, "target server")
     set_pterodactyl_domain(panel_domain)
     conf_path, service = write_conf(
-        host, f"Upstream: {host}", panel_domain, dynamic=dynamic
+        target_server, f"Upstream: {target_server}", panel_domain, dynamic=dynamic
     )
-    log.info("Wrote conf %s → %s (service=%s, re-resolve=%s)", conf_path, host, service, dynamic)
+    log.info(
+        "Wrote conf %s → %s (service=%s, re-resolve=%s)",
+        conf_path, target_server, service, dynamic,
+    )
     reload_service(service)
     return service

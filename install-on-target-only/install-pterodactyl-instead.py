@@ -2,8 +2,8 @@
 """Install Pterodactyl on the private (home) server instead of a plain jar.
 
 Usage (must pass exactly one of --vanilla or --blightfall):
-  sudo python3 install-pterodactyl-instead.py --vanilla
-  sudo python3 install-pterodactyl-instead.py --blightfall
+  sudo python3 install-pterodactyl-instead.py --vanilla --admin-email EMAIL --public-domain DOMAIN --proxy-ip IP
+  sudo python3 install-pterodactyl-instead.py --blightfall --admin-email EMAIL --public-domain DOMAIN --proxy-ip IP
 
 Places the panel on an atypical port (8443). After this finishes you must
 run the nomcproxy installer on the public proxy with --pterodactyl so the
@@ -41,12 +41,13 @@ MINECRAFT_PORT = 25565
 WINGS_API_PORT = 8080
 WINGS_SFTP_PORT = 2022
 
-PANEL_DIR = Path("/var/www/pterodactyl")
-CREDENTIALS_FILE = Path("/root/nomcproxy-pterodactyl-credentials.json")
+PANEL_DIR_PATH = Path("/var/www/pterodactyl")
+CREDENTIALS_FILE_PATH = Path("/root/nomcproxy-pterodactyl-credentials.json")
+SETTINGS_PATH = Path("/root/nomcproxy-target-settings.json")
 PANEL_TARBALL_URL = "https://github.com/pterodactyl/panel/releases/latest/download/panel.tar.gz"
 PHP_BIN = "php8.3"
 PHP_FPM_SERVICE = "php8.3-fpm"
-PHP_FPM_SOCK = "/run/php/php8.3-fpm.sock"
+PHP_FPM_SOCK_FILE = "/run/php/php8.3-fpm.sock"
 
 # Packages from https://docs.pterodactyl.io/v1/panel/getting-started
 PHP_PACKAGES = [
@@ -100,6 +101,36 @@ def echo0(*args, **kwargs) -> None:
     print(*args, **kwargs)
 
 
+def load_settings() -> OrderedDict:
+    if not SETTINGS_PATH.is_file():
+        return OrderedDict()
+    try:
+        return json.loads(SETTINGS_PATH.read_text(), object_pairs_hook=OrderedDict)
+    except (OSError, json.JSONDecodeError):
+        return OrderedDict()
+
+
+def save_settings(data: dict) -> None:
+    ordered = OrderedDict(data)
+    SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    SETTINGS_PATH.write_text(json.dumps(ordered, indent=2) + "\n")
+    os.chmod(SETTINGS_PATH, 0o600)
+
+
+def example_from_settings() -> str:
+    saved = load_settings()
+    if not saved.get("public_domain") or not saved.get("proxy_ip"):
+        return ""
+    mode = "--blightfall" if saved.get("mode") == "blightfall" else "--vanilla"
+    email = saved.get("admin_email") or "EMAIL"
+    return (
+        "Example:\n"
+        "  sudo python3 install-pterodactyl-instead.py "
+        f"{mode} --admin-email {email} "
+        f"--public-domain {saved['public_domain']} --proxy-ip {saved['proxy_ip']}"
+    )
+
+
 def is_service_active(name: str) -> bool:
     try:
         r = subprocess.run(
@@ -128,7 +159,7 @@ def require_running_webserver() -> tuple[int, str]:
 
 
 def pterodactyl_installed() -> bool:
-    return PANEL_DIR.is_dir() and (PANEL_DIR / "artisan").is_file()
+    return PANEL_DIR_PATH.is_dir() and (PANEL_DIR_PATH / "artisan").is_file()
 
 
 def apt_cmd() -> str | None:
@@ -157,13 +188,13 @@ def run_apt(args: list[str], allow_nonzero: bool = False) -> int:
 
 def pin_sury_php83() -> int:
     """Prefer SURY php8.3-* over any Debian php-* / php8.4 packages."""
-    pref = Path("/etc/apt/preferences.d/sury-php83")
-    pref.write_text(
+    pref_path = Path("/etc/apt/preferences.d/sury-php83")
+    pref_path.write_text(
         "Package: php8.3*\n"
         "Pin: origin packages.sury.org\n"
         "Pin-Priority: 1001\n"
     )
-    print(f"Pinned php8.3* to packages.sury.org ({pref})")
+    print(f"Pinned php8.3* to packages.sury.org ({pref_path})")
     return 0
 
 
@@ -199,14 +230,14 @@ def ensure_sury_php_repo() -> int:
         echo0("Error: failed to install SURY prerequisites")
         return 1
 
-    keyring = Path("/usr/share/keyrings/deb.sury.org-php.gpg")
-    list_file = Path("/etc/apt/sources.list.d/sury-php.list")
+    keyring_path = Path("/usr/share/keyrings/deb.sury.org-php.gpg")
+    list_file_path = Path("/etc/apt/sources.list.d/sury-php.list")
 
-    if not keyring.is_file():
+    if not keyring_path.is_file():
         print("Installing SURY archive key...")
         r = subprocess.run(
             [
-                "sudo", "curl", "-fsSLo", str(keyring),
+                "sudo", "curl", "-fsSLo", str(keyring_path),
                 "https://packages.sury.org/php/apt.gpg",
             ],
             capture_output=True,
@@ -216,7 +247,7 @@ def ensure_sury_php_repo() -> int:
             echo0(f"Error: failed to download SURY key: {r.stderr}")
             return r.returncode
 
-    if not list_file.is_file():
+    if not list_file_path.is_file():
         # Codename (trixie, bookworm, ...)
         r = subprocess.run(
             ["lsb_release", "-sc"],
@@ -228,11 +259,11 @@ def ensure_sury_php_repo() -> int:
             return r.returncode
         codename = r.stdout.strip()
         line = (
-            f"deb [signed-by={keyring}] https://packages.sury.org/php/ "
+            f"deb [signed-by={keyring_path}] https://packages.sury.org/php/ "
             f"{codename} main\n"
         )
         r = subprocess.run(
-            ["sudo", "tee", str(list_file)],
+            ["sudo", "tee", str(list_file_path)],
             input=line,
             text=True,
         )
@@ -393,7 +424,7 @@ class ServerInstallState:
     Passwords are stored only after the matching system call is validated.
     """
 
-    def __init__(self, path: Path = CREDENTIALS_FILE) -> None:
+    def __init__(self, path: Path = CREDENTIALS_FILE_PATH) -> None:
         self.path = path
         self.ops: OrderedDict[str, OrderedDict[str, str]] = OrderedDict()
         self.webserver: str | None = None
@@ -474,17 +505,17 @@ class ServerInstallState:
             return 1
         if not self.ops:
             return 0
-        tmp = self.path.with_suffix(".json.tmp")
+        tmp_path = self.path.with_suffix(".json.tmp")
         try:
-            tmp.write_text(json.dumps(self.ops, indent=2) + "\n")
-            tmp.chmod(0o600)
+            tmp_path.write_text(json.dumps(self.ops, indent=2) + "\n")
+            tmp_path.chmod(0o600)
         except OSError as e:
-            echo0(f"Error: failed to write temp credentials {tmp}: {e}")
+            echo0(f"Error: failed to write temp credentials {tmp_path}: {e}")
             return 1
         try:
             if self.path.exists():
                 self.path.unlink()
-            tmp.rename(self.path)
+            tmp_path.rename(self.path)
         except OSError as e:
             echo0(f"Error: failed to replace {self.path}: {e}")
             return 1
@@ -534,29 +565,29 @@ def download_panel() -> int:
     if pterodactyl_installed():
         print("Panel already present; skipping download")
         return 0
-    PANEL_DIR.mkdir(parents=True, exist_ok=True)
-    tarball = PANEL_DIR / "panel.tar.gz"
+    PANEL_DIR_PATH.mkdir(parents=True, exist_ok=True)
+    tarball_path = PANEL_DIR_PATH / "panel.tar.gz"
     print(f"Downloading panel from {PANEL_TARBALL_URL}")
     try:
-        urllib.request.urlretrieve(PANEL_TARBALL_URL, tarball)
+        urllib.request.urlretrieve(PANEL_TARBALL_URL, tarball_path)
     except Exception as e:
         echo0(f"Error: failed to download panel: {e}")
         return 1
-    rc = run(["tar", "-xzf", str(tarball), "-C", str(PANEL_DIR)])
-    tarball.unlink(missing_ok=True)
+    rc = run(["tar", "-xzf", str(tarball_path), "-C", str(PANEL_DIR_PATH)])
+    tarball_path.unlink(missing_ok=True)
     if rc != 0:
         return rc
-    if not (PANEL_DIR / "artisan").is_file():
+    if not (PANEL_DIR_PATH / "artisan").is_file():
         echo0("Error: panel archive did not contain artisan")
         return 1
     return 0
 
 
 def set_panel_permissions() -> int:
-    rc = run(["chmod", "-R", "755", str(PANEL_DIR / "storage"), str(PANEL_DIR / "bootstrap" / "cache")])
+    rc = run(["chmod", "-R", "755", str(PANEL_DIR_PATH / "storage"), str(PANEL_DIR_PATH / "bootstrap" / "cache")])
     if rc != 0:
         return rc
-    return run(["chown", "-R", "www-data:www-data", str(PANEL_DIR)])
+    return run(["chown", "-R", "www-data:www-data", str(PANEL_DIR_PATH)])
 
 
 def db_password_works(password: str) -> bool:
@@ -578,11 +609,11 @@ def db_password_works(password: str) -> bool:
 
 def admin_user_exists() -> bool:
     """True if the panel users table already has username admin."""
-    env_file = PANEL_DIR / ".env"
-    if not env_file.is_file():
+    env_file_path = PANEL_DIR_PATH / ".env"
+    if not env_file_path.is_file():
         return False
     password = None
-    for line in env_file.read_text().splitlines():
+    for line in env_file_path.read_text().splitlines():
         if line.startswith("DB_PASSWORD="):
             password = line.split("=", 1)[1]
             break
@@ -609,21 +640,21 @@ def admin_user_exists() -> bool:
 
 
 def app_key_present() -> bool:
-    env_file = PANEL_DIR / ".env"
-    if not env_file.is_file():
+    env_file_path = PANEL_DIR_PATH / ".env"
+    if not env_file_path.is_file():
         return False
-    for line in env_file.read_text().splitlines():
+    for line in env_file_path.read_text().splitlines():
         if line.startswith("APP_KEY=") and line.split("=", 1)[1].startswith("base64:"):
             return True
     return False
 
 
 def migrations_present() -> bool:
-    env_file = PANEL_DIR / ".env"
-    if not env_file.is_file():
+    env_file_path = PANEL_DIR_PATH / ".env"
+    if not env_file_path.is_file():
         return False
     password = None
-    for line in env_file.read_text().splitlines():
+    for line in env_file_path.read_text().splitlines():
         if line.startswith("DB_PASSWORD="):
             password = line.split("=", 1)[1]
             break
@@ -699,14 +730,14 @@ def setup_database(state: ServerInstallState) -> int:
 
 
 def write_env(db_password: str, public_domain: str, proxy_ip: str) -> int:
-    env_example = PANEL_DIR / ".env.example"
-    env_file = PANEL_DIR / ".env"
-    if not env_example.is_file():
-        echo0(f"Error: {env_example} missing")
+    env_example_path = PANEL_DIR_PATH / ".env.example"
+    env_file_path = PANEL_DIR_PATH / ".env"
+    if not env_example_path.is_file():
+        echo0(f"Error: {env_example_path} missing")
         return 1
-    if not env_file.is_file():
-        shutil.copy(env_example, env_file)
-    text = env_file.read_text()
+    if not env_file_path.is_file():
+        shutil.copy(env_example_path, env_file_path)
+    text = env_file_path.read_text()
     replacements = {
         "APP_URL": f"https://{public_domain}",
         "APP_TIMEZONE": "UTC",
@@ -734,7 +765,7 @@ def write_env(db_password: str, public_domain: str, proxy_ip: str) -> int:
     for key, value in replacements.items():
         if key not in seen:
             lines.append(f"{key}={value}")
-    env_file.write_text("\n".join(lines) + "\n")
+    env_file_path.write_text("\n".join(lines) + "\n")
     return 0
 
 
@@ -743,16 +774,16 @@ def composer_install_and_key() -> int:
     env["COMPOSER_ALLOW_SUPERUSER"] = "1"
     rc = run(
         ["composer", "install", "--no-dev", "--optimize-autoloader", "--no-interaction"],
-        cwd=PANEL_DIR,
+        cwd=PANEL_DIR_PATH,
         env=env,
     )
     if rc != 0:
         return rc
-    return run([PHP_BIN, "artisan", "key:generate", "--force"], cwd=PANEL_DIR)
+    return run([PHP_BIN, "artisan", "key:generate", "--force"], cwd=PANEL_DIR_PATH)
 
 
 def migrate_seed() -> int:
-    return run([PHP_BIN, "artisan", "migrate", "--seed", "--force"], cwd=PANEL_DIR)
+    return run([PHP_BIN, "artisan", "migrate", "--seed", "--force"], cwd=PANEL_DIR_PATH)
 
 
 def create_admin(state: ServerInstallState) -> int:
@@ -775,7 +806,7 @@ def create_admin(state: ServerInstallState) -> int:
             "--admin=1",
             "--no-interaction",
         ],
-        cwd=PANEL_DIR,
+        cwd=PANEL_DIR_PATH,
     )
     if rc != 0:
         return rc
@@ -799,8 +830,8 @@ def install_queue_and_cron(state: ServerInstallState) -> int:
         warn_skip("queue worker and cron", state)
         return 0
     if not is_service_active("pteroq"):
-        unit = Path("/etc/systemd/system/pteroq.service")
-        unit.write_text("""[Unit]
+        unit_path = Path("/etc/systemd/system/pteroq.service")
+        unit_path.write_text("""[Unit]
 Description=Pterodactyl Queue Worker
 After=redis-server.service
 
@@ -862,12 +893,12 @@ WantedBy=multi-user.target
 
 def write_site_conf(webserver: str) -> int:
     if webserver == "angie":
-        http_d = Path("/etc/angie/http.d")
-        conf_dir = http_d if http_d.is_dir() else Path("/etc/angie/conf.d")
+        http_d_path = Path("/etc/angie/http.d")
+        conf_dir_path = http_d_path if http_d_path.is_dir() else Path("/etc/angie/conf.d")
     else:
-        conf_dir = Path("/etc/nginx/conf.d")
-    conf_dir.mkdir(parents=True, exist_ok=True)
-    conf_path = conf_dir / "pterodactyl.conf"
+        conf_dir_path = Path("/etc/nginx/conf.d")
+    conf_dir_path.mkdir(parents=True, exist_ok=True)
+    conf_path = conf_dir_path / "pterodactyl.conf"
     if conf_path.is_file() and f"listen {PANEL_PORT}" in conf_path.read_text():
         warn_skip(f"site conf {conf_path}")
         return 0
@@ -885,7 +916,7 @@ def write_site_conf(webserver: str) -> int:
     }}
     location ~ \\.php$ {{
         fastcgi_split_path_info ^(.+\\.php)(/.+)$;
-        fastcgi_pass unix:{PHP_FPM_SOCK};
+        fastcgi_pass unix:{PHP_FPM_SOCK_FILE};
         fastcgi_index index.php;
         include fastcgi_params;
         fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
@@ -934,13 +965,13 @@ def install_panel(state: ServerInstallState, public_domain: str, proxy_ip: str) 
         echo0("Error: no validated database password")
         return 1
 
-    env_file = PANEL_DIR / ".env"
+    env_file_path = PANEL_DIR_PATH / ".env"
     expected_url = f"APP_URL=https://{public_domain}"
     env_ok = (
-        env_file.is_file()
-        and f"DB_PASSWORD={db_password}" in env_file.read_text()
-        and expected_url in env_file.read_text()
-        and f"TRUSTED_PROXIES={proxy_ip}" in env_file.read_text()
+        env_file_path.is_file()
+        and f"DB_PASSWORD={db_password}" in env_file_path.read_text()
+        and expected_url in env_file_path.read_text()
+        and f"TRUSTED_PROXIES={proxy_ip}" in env_file_path.read_text()
     )
     if env_ok:
         warn_skip("environment file", state)
@@ -950,16 +981,16 @@ def install_panel(state: ServerInstallState, public_domain: str, proxy_ip: str) 
             state.record("environment file", "failed")
             return rc
         state.record("environment file", "done")
-        run([PHP_BIN, "artisan", "config:clear"], cwd=PANEL_DIR)
+        run([PHP_BIN, "artisan", "config:clear"], cwd=PANEL_DIR_PATH)
 
-    if (PANEL_DIR / "vendor" / "autoload.php").is_file():
+    if (PANEL_DIR_PATH / "vendor" / "autoload.php").is_file():
         warn_skip("composer install", state)
     else:
         env = os.environ.copy()
         env["COMPOSER_ALLOW_SUPERUSER"] = "1"
         rc = run(
             ["composer", "install", "--no-dev", "--optimize-autoloader", "--no-interaction"],
-            cwd=PANEL_DIR,
+            cwd=PANEL_DIR_PATH,
             env=env,
         )
         if rc != 0:
@@ -970,7 +1001,7 @@ def install_panel(state: ServerInstallState, public_domain: str, proxy_ip: str) 
     if app_key_present():
         warn_skip("application key", state)
     else:
-        rc = run([PHP_BIN, "artisan", "key:generate", "--force"], cwd=PANEL_DIR)
+        rc = run([PHP_BIN, "artisan", "key:generate", "--force"], cwd=PANEL_DIR_PATH)
         if rc != 0:
             state.record("application key", "failed")
             return rc
@@ -1010,7 +1041,9 @@ def install_panel(state: ServerInstallState, public_domain: str, proxy_ip: str) 
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Install or configure Pterodactyl on the private server"
+        description="Install or configure Pterodactyl on the private server",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=example_from_settings(),
     )
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--vanilla", action="store_true", help="Prepare for vanilla Minecraft")
@@ -1034,6 +1067,12 @@ def main() -> int:
         help="Public IPv4 of the proxy (written as TRUSTED_PROXIES; not *)",
     )
     args = parser.parse_args()
+    save_settings({
+        "mode": "vanilla" if args.vanilla else "blightfall",
+        "admin_email": args.admin_email,
+        "public_domain": args.public_domain,
+        "proxy_ip": args.proxy_ip,
+    })
 
     mode = "vanilla" if args.vanilla else "blightfall"
     if not is_valid_email(args.admin_email):
@@ -1109,7 +1148,7 @@ def main() -> int:
         print("Next step on the public proxy")
         print("=" * 60)
         print("On the VPS that runs nomcproxy, re-run the installer with --pterodactyl:")
-        print("  sudo python3 install.py --host <home-hostname-or-ip> \\")
+        print("  sudo python3 install.py --target-server <home-hostname-or-ip> \\")
         print("    --pterodactyl --pterodactyl-domain <base-domain>")
         print()
         print("That makes the proxy listen on the typical HTTPS port and forward")
