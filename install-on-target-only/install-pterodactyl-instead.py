@@ -142,19 +142,40 @@ def is_service_active(name: str) -> bool:
         return False
 
 
-def require_running_webserver() -> tuple[int, str]:
-    """Return (0, 'angie'|'nginx') if one is running, else (1, '').
+def is_service_enabled(name: str) -> bool:
+    try:
+        r = subprocess.run(
+            ["systemctl", "is-enabled", "--quiet", name],
+            capture_output=True,
+        )
+        return r.returncode == 0
+    except FileNotFoundError:
+        return False
 
-    Do not install a web server — the user may have a packaged or
-    compiled Angie (or other) that we must not overwrite.
+
+def require_running_webserver() -> tuple[int, str]:
+    """Return (0, 'angie'|'nginx') if that unit is enabled or running.
+
+    Prefer Angie. Do not install a web server — the user may have a
+    packaged or compiled Angie that we must not overwrite. If neither
+    unit is enabled, systemd is missing, or detection fails, fall back
+    to angie.conf, then nginx.conf.
     """
-    if is_service_active("angie"):
+    try:
+        if is_service_active("angie") or is_service_enabled("angie"):
+            return 0, "angie"
+        if is_service_active("nginx") or is_service_enabled("nginx"):
+            return 0, "nginx"
+    except Exception:
+        pass
+    if Path("/etc/angie/angie.conf").is_file():
         return 0, "angie"
-    if is_service_active("nginx"):
+    if Path("/etc/nginx/nginx.conf").is_file():
         return 0, "nginx"
-    echo0("Error: neither angie nor nginx is running.")
-    echo0("Start one of them first. This script will not install a web server")
-    echo0("(you may already have a packaged or compiled Angie).")
+    echo0("Error: neither angie nor nginx is enabled, and no angie.conf")
+    echo0("or nginx.conf was found. Enable the one you use")
+    echo0("(systemctl enable --now angie) and re-run.")
+    echo0("This script will not install a web server.")
     return 1, ""
 
 

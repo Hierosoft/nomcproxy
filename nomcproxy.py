@@ -803,10 +803,39 @@ def write_minecraft_conf(upstream: str, service: str, dynamic: bool, comment: st
     return path
 
 
+def is_service_enabled(service: str) -> bool:
+    """True if the unit is enabled (starts on boot), even if stopped now."""
+    try:
+        r = subprocess.run(
+            ["systemctl", "is-enabled", "--quiet", service],
+            capture_output=True,
+        )
+        return r.returncode == 0
+    except FileNotFoundError:
+        return False
+
+
 def active_service() -> str:
-    if is_service_active("angie"):
+    """Angie if that unit is enabled or running, else nginx.
+
+    If neither unit is enabled, systemd is missing, or detection fails,
+    fall back to angie.conf, then nginx.conf.
+    """
+    try:
+        if is_service_active("angie") or is_service_enabled("angie"):
+            return "angie"
+        if is_service_active("nginx") or is_service_enabled("nginx"):
+            return "nginx"
+    except Exception:
+        pass
+    if Path("/etc/angie/angie.conf").is_file():
         return "angie"
-    return "nginx"
+    if Path("/etc/nginx/nginx.conf").is_file():
+        return "nginx"
+    raise RuntimeError(
+        "Error: neither angie nor nginx is enabled, and no angie.conf "
+        "or nginx.conf was found."
+    )
 
 
 def proxy_conf_paths() -> list[Path]:
@@ -849,22 +878,33 @@ def pterodactyl_enabled() -> bool:
 
 
 def reload_service(service: str) -> None:
+    action = "reload" if is_service_active(service) else "start"
     try:
         subprocess.run(
-            ["systemctl", "reload", service],
+            ["systemctl", action, service],
             check=True,
             capture_output=True,
             text=True,
         )
-        log.info("Reloaded %s", service)
+        log.info("%s %s", action.capitalize(), service)
     except subprocess.CalledProcessError as e:
-        log.error("Failed to reload %s: %s", service, e.stderr or e)
+        log.error("Failed to %s %s: %s", action, service, e.stderr or e)
         raise
 
 
 def write_conf(upstream: str, comment: str = "", panel_domain: str | None = None, dynamic: bool = False) -> tuple[Path, str]:
     """Write Minecraft stream conf and, if a domain is given, the panel vhost."""
     service = active_service()
+    if service == "angie":
+        # A stopped Angie used to fall through to nginx and write here.
+        for name in (
+            CONF_NAME, PANEL_CONF_NAME, SITE_CONF_NAME,
+            WINGS_CONF_NAME, SFTP_CONF_NAME, *OLD_SITE_CONF_NAMES,
+        ):
+            stray = Path("/etc/nginx/conf.d") / name
+            if stray.is_file():
+                stray.unlink()
+                log.info("Removed stray nginx conf %s", stray)
     conf_path = write_minecraft_conf(upstream, service, dynamic, comment)
     if panel_domain:
         write_panel_conf(upstream, panel_domain, service, dynamic)

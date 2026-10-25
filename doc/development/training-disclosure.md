@@ -695,3 +695,12 @@ Keep in mind that my angie config has a fallback site in case someone types an a
 - paste 00-default.conf (correct place for default_server in this case)
 
 You should make sure we name order-dependent angie conf files an actual numerical prefix like "00-" not literally "##-"
+
+- 2026-10-24
+
+We should detect angie and use it if we ever try to mess with services, but the proxy install says:
+- paste nginx reload error
+
+We should check if the service is enabled, not if the conf is present.
+
+If we detect that neither angie nor nginx are enabled, or the system isn't using systemd or for any other reason detection fails, fall back to checking for angie.conf.
