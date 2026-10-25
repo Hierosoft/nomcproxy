@@ -720,3 +720,8 @@ Do we really need this php vulnerability workaround in the latest version of ang
 - paste 00-fpm.conf from target (only has `upstream php-handler` section)
 
 - paste error `angie: [emerg] named location "@redacted" can occur on the server level only in` and other output
+
+- 2026-10-24
+
+We never actually define the new acme client starting with panel_:
+- paste error missing panel_redacted_com acme client

@@ -584,7 +584,7 @@ def make_site_conf(apex: str, service: str) -> str:
     name = acme_client_name(apex)
     sock = php_fpm_sock()
     if service == "angie":
-        if acme_client_defined(name):
+        if acme_client_defined(name, exclude=Path("/etc/angie/http.d") / SITE_CONF_NAME):
             acme = f"# reusing existing acme_client {name}\n"
         else:
             acme = f"""# ACME client for the public site. Edit the email, then: angie -t && systemctl reload angie
@@ -649,7 +649,7 @@ def make_panel_conf(upstream: str, domain: str, service: str, dynamic: bool) -> 
     """HTTP virtual host for the panel. Does not listen as a raw TCP 443 grab."""
     name = acme_client_name(domain)
     if service == "angie":
-        if acme_client_defined(name):
+        if acme_client_defined(name, exclude=Path("/etc/angie/http.d") / PANEL_CONF_NAME):
             acme = f"# reusing existing acme_client {name}\n"
         else:
             acme = f"""# ACME client for this domain. Edit the email, then: angie -t && systemctl reload angie
@@ -711,19 +711,37 @@ server {{
 """
 
 
-def acme_client_defined(name: str) -> bool:
-    """True if some http conf already defines this acme_client."""
-    root_paths = [Path("/etc/angie/http.d"), Path("/etc/angie/conf.d"), Path("/etc/nginx/conf.d")]
-    needle = f"acme_client {name}"
-    for root_path in root_paths:
-        if not root_path.is_dir():
+def acme_client_defined(name: str, exclude: Path | None = None) -> bool:
+    """True if some other conf defines this acme_client (not a comment).
+
+    Looks in http.d, conf.d, local/, and the main conf. Skips the file
+    we are about to rewrite, and skips commented lines, so a previous
+    "reusing existing" note cannot count as a definition.
+    """
+    roots = [
+        Path("/etc/angie/http.d"),
+        Path("/etc/angie/conf.d"),
+        Path("/etc/angie/local"),
+        Path("/etc/nginx/conf.d"),
+        Path("/etc/nginx/local"),
+    ]
+    files = [Path("/etc/angie/angie.conf"), Path("/etc/nginx/nginx.conf")]
+    for root in roots:
+        if root.is_dir():
+            files.extend(root.glob("*.conf"))
+    pattern = re.compile(rf"^\s*acme_client\s+{re.escape(name)}\b")
+    for path in files:
+        if exclude is not None and path.resolve() == exclude.resolve():
             continue
-        for path in root_path.glob("*.conf"):
-            try:
-                if needle in path.read_text():
-                    return True
-            except OSError:
+        try:
+            text = path.read_text()
+        except OSError:
+            continue
+        for line in text.splitlines():
+            if line.lstrip().startswith("#"):
                 continue
+            if pattern.search(line):
+                return True
     return False
 
 
