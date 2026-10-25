@@ -825,4 +825,11 @@ Traceback (most recent call last):
 AttributeError: module 'nomcproxy' has no attribute 'acme_client_defined'. Did you mean: 'acme_client_name'?
 ```
 
+- 2026-10-25
+
 On proxy I get Error: name 'SFTP_CONF_NAME' is not defined
+
+- 2026-10-25
+
+On the home server, ./install-pterodactyl-instead.py (with necessary args) causes:
+- paste `NameError: name 'docker_present' is not defined` ... etc

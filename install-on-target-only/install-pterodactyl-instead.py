@@ -1271,6 +1271,9 @@ def point_wings_at_synced_cert() -> int:
     if is_service_active("wings"):
         return run(["systemctl", "restart", "wings"])
     return 0
+
+
+def docker_present() -> bool:
     """True if the docker CLI exists or the docker unit is active/enabled."""
     if shutil.which("docker"):
         return True
