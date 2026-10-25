@@ -251,6 +251,9 @@ def firewall_hint(ports: list[tuple[int, str, str]]) -> list[str]:
         for port, proto, desc in ports:
             lines.append(f"  tcp dport {port} accept   # {desc} ({proto})")
     return lines
+
+
+def detect_firewall() -> str | None:
     """Return the name of a running firewall service, or None."""
     for name in ("ufw", "firewalld", "nftables"):
         if is_service_active(name):

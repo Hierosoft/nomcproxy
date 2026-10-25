@@ -677,3 +677,8 @@ What is the point of https://panel.example.com if https://panel.example.com/admi
 What valuable services can be provide to players using a pterydactyl login, and can we let them log in using their microsoft account?
 
 Ok we don't have to look into that further. Just explain some brief info about that (admin stuff, not player stuff, not MS account stuff) to a Pterydactyl section of the readme. After completing setup on proxy or target, check access to the opposite server and try to determine what steps don't seem to be done. For example, after installing proxy and showing setup steps, show warnings about things not yet done such as port so and so isn't responding (or doesn't appear to be pterydactyl) and make sure you run the appropriate install only on target script on your home/target server and have forwarded port so and so. Also check if potential firewall services are up, and if possible check if appropriate rules are configured and show necessary commands (or emit config files and say where they are) but only for a firewall that is specifically known to be running. Perform similar checks after running the target server install on the target server, by checking the known public address and/or hostname ports and subdomains, whatever seems appropriate, and suggest steps. This should appear pretty friendly and not like errors, just saying what the next steps are (run [main script name] on the public proxy VPS and ensure ports are open on any running firewall service).
+
+- 2026-10-24
+
+On the target machine, cd install-on-target-only && ./install-pterodactyl-instead.py (with --blightfall --admin-email --public-domain --proxy-ip options) says:
+- paste error regarding missing function detect_firewall
