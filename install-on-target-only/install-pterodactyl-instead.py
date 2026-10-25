@@ -398,16 +398,101 @@ def print_port_forward_instructions() -> None:
     print("printed by install.py on the public proxy.")
 
 
-def print_node_fqdn(apex: str) -> None:
-    """Short note. The full public guide is printed by the proxy installer."""
+def print_node_fqdn(apex: str, mode: str) -> None:
+    """Panel GUI steps. Always printed; these cannot be detected as done."""
+    label = apex.split(".")[0]
+    location = label[:1].upper() + label[1:] if label else apex
+    node = "node." + apex
+    mc = "mc." + apex
+    panel = "panel." + apex
+    disk = "40 GB" if mode == "blightfall" else "15 GB"
+    bar = "=" * 60
     print()
-    print("=" * 60)
-    print("Pterodactyl node")
-    print("=" * 60)
-    print("Do not enter this machine's IP or dynamic hostname as the node FQDN.")
-    print("The public proxy installer prints the FQDN, location name, and")
-    print("node name to use. Create the node only after that name resolves.")
-    print("=" * 60)
+    print(bar)
+    print("Panel GUI — create the node (Admin → Nodes → Create New)")
+    print(bar)
+    print("Do this in the panel after panel." + apex + " resolves.")
+    print("Do not use this machine's IP or dynamic hostname anywhere below.")
+    print()
+    print(f"  Name:            {label}")
+    print(f"  Location:        {location}   (create it if it is not listed)")
+    print(f"  FQDN:            {node}")
+    print(f"                   not {panel}, not {mc}, not an IP")
+    print("  Behind Proxy:    Yes")
+    print("                   (this is your Racknerd proxy, not Cloudflare)")
+    print("  Visibility:      Public")
+    print("  Daemon Port:     8080")
+    print("  Daemon SFTP:     2022")
+    print("  Use SSL:         Yes")
+    print()
+    print("Disk on the node is the cap for every server combined.")
+    print("Set it to free space on this machine minus about 20%.")
+    print(bar)
+    print()
+    print(bar)
+    print("Panel GUI — allocation (node → Allocation tab)")
+    print(bar)
+    print("The IP must be an address on this machine. Wings cannot bind")
+    print("the Racknerd public IP. Get this machine's address with:")
+    print("  hostname -I | awk '{print $1}'")
+    print()
+    print("  IP:      that address, or 0.0.0.0")
+    print("  Port:    25565")
+    print(f"  Alias:   {mc}")
+    print()
+    print("To allow only the proxy in, permit 25565/tcp from the Racknerd")
+    print("IP on this machine's firewall or the home router. The allocation")
+    print("is the listen address, not an allow-list.")
+    print(bar)
+    print()
+    print(bar)
+    print("Panel GUI — after the node is saved")
+    print(bar)
+    if WINGS_CONF_PATH.is_file():
+        print("Wings is already configured (config.yml exists).")
+        if is_service_active("wings"):
+            print("wings.service is running. The node page should show online.")
+        else:
+            print("config.yml exists but wings is not running. Start it:")
+            print("  systemctl start wings")
+            print("  journalctl -u wings -n 40 --no-pager")
+    else:
+        print("On the node page, Configuration → Generate Token, then on")
+        print("this machine (the panel URL must be the panel subdomain):")
+        print(f"  cd /etc/pterodactyl && wings configure \\")
+        print(f"    --panel-url https://{panel} --token <token> --node 1")
+        print("Then: systemctl start wings")
+        print("Do not use the apex domain and do not add :8443.")
+    print(bar)
+
+
+def print_server_gui(mode: str) -> None:
+    """Server-creation steps. Always printed; egg import cannot be detected."""
+    disk = "40 GB" if mode == "blightfall" else "15 GB"
+    bar = "=" * 60
+    print()
+    print(bar)
+    print(f"Panel GUI — create the {mode} server")
+    print(bar)
+    if mode == "vanilla":
+        print("1. Admin → Nests → Import Egg.")
+        print("   Official egg: github.com/pterodactyl/game-eggs")
+        print("   minecraft/java/vanilla (or paper).")
+        print("2. Default yolk is a latest-Java image. No special yolk.")
+        print(f"3. Create the server. Disk: {disk}. Allocation: 25565.")
+        print("4. Start it.")
+    else:
+        print("1. Download the egg JSON:")
+        print("   https://eggs.pterodactyl.io/egg/games-blightfall/")
+        print("2. Admin → Nests → Import Egg, upload the JSON.")
+        print("3. Create the server. On Startup set the Docker image to:")
+        print("   ghcr.io/pterodactyl/yolks:java_8")
+        print("   (Forge 1.7.10 requires Java 8).")
+        print(f"4. Disk: {disk}. Allocation: 25565. Start it.")
+    print()
+    print("Microsoft login on Azuriom is unrelated to this server.")
+    print("Blightfall is Forge 1.7.10; AzLink has no Forge build for it.")
+    print(bar)
 
 
 def print_proxy_next_steps(proxy_ip: str, public_domain: str) -> None:
@@ -1391,7 +1476,8 @@ def main() -> int:
             return rc
 
         print_egg_instructions(mode)
-        print_node_fqdn(args.public_domain)
+        print_node_fqdn(args.public_domain, mode)
+        print_server_gui(mode)
         print_port_forward_instructions()
         nomcproxy.print_firewall_instructions(
             [

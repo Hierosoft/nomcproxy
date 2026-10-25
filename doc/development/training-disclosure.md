@@ -779,3 +779,10 @@ But the auto deploy command doesn't create the dir nor install wings, it starts 
 - paste output of install
 
 We should automate checking for wings, installing wings deps, installing wings, checking if the unit exists, checking if the unit is enabled, and creating the unit if not, checking if it is running, starting it if not, then seeing if starting it worked and showing the error(s) if not.
+
+- 2026-10-25
+
+You said not to put the public IP nor private IP in allocations, but https://docs.pterodactyl.io/v2/wings/installing says use `hostname -I | awk '{print $1}'` (but doesn't say which machine...)
+- The answer is put the LAN IP of the target there, but use public mc.* address of proxy as the alias.
+
+All of these questions I've been asking regarding manual steps in the web GUI etc should be spelled out as instructions after install complete (with skips or not) except for instructions which can be detected as done and are done.

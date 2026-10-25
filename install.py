@@ -81,7 +81,7 @@ def print_completion_guide(apex: str, target_server: str) -> None:
     node = "node." + apex
     label = apex.split(".")[0]
     location = label[:1].upper() + label[1:] if label else apex
-    node_name = "proxy"
+    node_name = label
     bar = "=" * 60
 
     print()
@@ -114,9 +114,20 @@ def print_completion_guide(apex: str, target_server: str) -> None:
     print(f"  Node name:      {node_name}")
     print("                  (public name; do not use the home hostname)")
     print("  Behind Proxy:   Yes")
+    print("                  (your Racknerd proxy, not Cloudflare)")
+    print("  Visibility:     Public")
     print("  Daemon Port:    8080")
     print("  Daemon SFTP:    2022")
     print("  Use SSL:        Yes")
+    print()
+    print("Disk on the node is the cap for every server combined.")
+    print("Set it to free space on the home server minus about 20%.")
+    print()
+    print("Allocation (node → Allocation tab), on the home machine:")
+    print("  IP:     output of:  hostname -I | awk '{print $1}'")
+    print("          or 0.0.0.0. Not the Racknerd IP. Not the dynamic hostname.")
+    print("  Port:   25565")
+    print(f"  Alias:  {mc}")
     print()
     print("The proxy forwards those daemon ports:")
     print(f"  {node}:8080  →  home:8080  (Wings)")
@@ -156,7 +167,7 @@ def print_completion_guide(apex: str, target_server: str) -> None:
     print("Vanilla:")
     print("  Admin → Nests → Import Egg, official Minecraft Vanilla / Paper")
     print("  egg (github.com/pterodactyl/game-eggs, minecraft/java/vanilla).")
-    print("  Default yolk is a latest-Java image. Allocate port 25565.")
+    print("  Default yolk is a latest-Java image. Disk: 15 GB. Allocate port 25565.")
     print()
     print("Blightfall (1.7.10):")
     print("  1. Download the egg JSON:")
@@ -165,10 +176,14 @@ def print_completion_guide(apex: str, target_server: str) -> None:
     print("  3. On the server Startup page set the Docker image (yolk) to:")
     print("     ghcr.io/pterodactyl/yolks:java_8")
     print("     (Forge 1.7.10 requires Java 8).")
-    print("  4. Allocate port 25565 and start the server.")
+    print("  4. Disk: 40 GB. Allocate port 25565 and start the server.")
     print()
-    print("Install Wings on the home server after the node exists.")
-    print("The panel's node page shows the Wings install command.")
+    print("Wings is installed by install-pterodactyl-instead.py on the home")
+    print("server. After the node exists, Configuration → Generate Token,")
+    print("then on the home server:")
+    print(f"  cd /etc/pterodactyl && wings configure \\")
+    print(f"    --panel-url https://{panel} --token <token> --node 1")
+    print("  systemctl start wings")
     print(bar)
 
 
