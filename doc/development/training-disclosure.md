@@ -704,3 +704,19 @@ We should detect angie and use it if we ever try to mess with services, but the 
 We should check if the service is enabled, not if the conf is present.
 
 If we detect that neither angie nor nginx are enabled, or the system isn't using systemd or for any other reason detection fails, fall back to checking for angie.conf.
+
+- 2026-10-24
+
+We have a problem with the conf being generated. I've included some other conf files from other sites (that we shouldn't mess with; but provide recommendations regarding warnings if possible; we can move some stuff to a 00-fpm.conf and rename 00-default to 01-default if that helps):
+- paste `angie: [emerg] "resolver" directive is duplicate in /etc/angie/stream.d/nomcproxy-sftp.conf:4`, warnings, and my other site's conf
+
+
+provide an improved opendungeons conf, 01-default.conf, and 00-fpm.conf in the cavas root (not in the nomcproxy folder) for reference.
+- paste 00-default.conf
+
+Move the 00 and 01 conf files to a folder called http.d-non-nomcproxy-sites. Add a copy of the old 00-default.conf and opendungeons.org.conf I originally pasted in a separate folder called http.d-non-nomcproxy-sites/old.
+
+Do we really need this php vulnerability workaround in the latest version of angie packaged for trixie? On my target server, the following 00-fpm.conf works fine:
+- paste 00-fpm.conf from target (only has `upstream php-handler` section)
+
+- paste error `angie: [emerg] named location "@redacted" can occur on the server level only in` and other output

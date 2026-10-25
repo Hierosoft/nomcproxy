@@ -462,9 +462,9 @@ def make_stream_conf(
         header += f"# {comment}\n"
     var = re.sub(r"[^A-Za-z0-9]", "_", role)
     if dynamic:
-        body = f"""    resolver {RESOLVERS} valid=30s;
-    server {{
+        body = f"""    server {{
         listen {listen_port};
+        resolver {RESOLVERS} valid=30s;
         set ${var}_upstream {upstream};
         proxy_pass ${var}_upstream:{backend_port};
         proxy_timeout 10m;
@@ -521,6 +521,35 @@ def acme_client_name(domain: str) -> str:
     return re.sub(r"[^A-Za-z0-9]", "_", domain)
 
 
+def ssl_already_on_443(service: str) -> bool:
+    """True if some other conf already sets ssl on the shared 443 socket.
+
+    Angie warns (and the host's own sites avoid) redefining protocol
+    options. ssl belongs once, on the default server.
+    """
+    conf_dir_path = panel_conf_dir(service)
+    if not conf_dir_path.is_dir():
+        return False
+    ours = {PANEL_CONF_NAME, SITE_CONF_NAME, *OLD_SITE_CONF_NAMES}
+    for path in conf_dir_path.glob("*.conf"):
+        if path.name in ours:
+            continue
+        try:
+            text = path.read_text()
+        except OSError:
+            continue
+        if re.search(r"listen\s+[^;]*\b443\b[^;]*\bssl\b", text):
+            return True
+    return False
+
+
+def listen_443(service: str) -> str:
+    """listen line for 443. Omit ssl when another conf already set it."""
+    if service == "angie" and ssl_already_on_443(service):
+        return "listen 443;  # ssl is set once, on the default server"
+    return "listen 443 ssl;"
+
+
 def php_fpm_sock() -> str | None:
     """First PHP-FPM socket found, preferring newer versions."""
     candidates = []
@@ -549,7 +578,7 @@ def make_site_conf(apex: str, service: str) -> str:
     the apex to Pterodactyl. Do not set default_server: the host already
     has a fallback (00-default.conf) and a second one is fatal. The
     filename starts with 02- so it is included after 00- and 01-;
-    fallback; matching is by server_name, not by being the default.
+    matching is by server_name, not by being the default.
     """
     root = site_root(apex)
     name = acme_client_name(apex)
@@ -597,7 +626,7 @@ acme_client {name}
 }}
 
 server {{
-    listen 443 ssl;
+    {listen_443(service)}
     server_name {apex} www.{apex};
 {ssl}    root {root};
     index index.php index.html;
@@ -666,7 +695,7 @@ acme_client {name}
 }}
 
 server {{
-    listen 443 ssl;
+    {listen_443(service)}
     server_name {domain};
 {ssl}{logs}    client_max_body_size 100m;
 

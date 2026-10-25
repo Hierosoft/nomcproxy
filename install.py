@@ -315,6 +315,14 @@ def main() -> int:
         panel = names[2] if names else None
         service = nomcproxy.apply_target_server(args.target_server, panel_domain=panel)
         print(f"Configuration applied for {args.target_server}")
+        if service == "angie" and nomcproxy.ssl_already_on_443(service):
+            print()
+            print("443 ssl is already set (your 00-default.conf). nomcproxy")
+            print("omitted ssl on its own listen lines so it does not redefine")
+            print("protocol options. Other sites that still say 'listen 443 ssl'")
+            print("or set http2 on a later server will keep warning; leave them")
+            print("as 'listen 443;' and keep ssl/http2 only on the default server.")
+            print("No need to rename 00-default or add a 00-fpm.conf for this.")
         if names:
             nomcproxy.ensure_dummy_site(names[0])
             stealers = nomcproxy.other_http_servers(service, names[0])
