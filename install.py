@@ -129,6 +129,12 @@ def print_completion_guide(apex: str, target_server: str) -> None:
     print(f"  Minecraft:  {mc}:25565")
     print(f"  Panel:      https://{panel}")
     print(f"  Admin:      https://{panel}/admin")
+    print(f"  Website:    https://{apex}")
+    print()
+    print(f"{apex} is a local site on this proxy, not the panel and not the")
+    print("home server. Put Azuriom there (extract so the root is")
+    print(f"/var/www/{apex}/public). AzLink on the Minecraft server connects")
+    print("the site to the game. Do not install Azuriom through Pterodactyl.")
 
     print()
     print(bar)
@@ -311,6 +317,13 @@ def main() -> int:
         print(f"Configuration applied for {args.target_server}")
         if names:
             nomcproxy.ensure_dummy_site(names[0])
+            stealers = nomcproxy.other_http_servers(service, names[0])
+            if stealers:
+                print()
+                print("Other HTTP confs also name this domain. They can steal the request:")
+                for path in stealers:
+                    print(f"  {path}")
+                print("Disable or rename those if the apex or panel lands on the wrong site.")
     except Exception as e:
         echo0(f"Error: {e}")
         return 1

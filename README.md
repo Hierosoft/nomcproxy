@@ -152,6 +152,13 @@ website.
 The panel itself runs on the home server, on port 8443. The public proxy
 exposes it as `https://panel.<domain>`. Do not publish the home address.
 
+The apex (`https://<domain>`) is a separate local site on the proxy. It is
+the default server, so it does not fall through to the panel. Azuriom
+belongs there, not on the home server and not inside Pterodactyl: extract
+it so the root is `/var/www/<domain>/public`, then put the AzLink plugin
+on the Minecraft server. Azuriom's own docs say to keep it on a different
+name from the panel.
+
 Instead of a plain jar you can run Pterodactyl on the home machine:
 
 ```bash

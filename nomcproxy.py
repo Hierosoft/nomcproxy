@@ -19,6 +19,8 @@ from pathlib import Path
 
 CONF_NAME = "nomcproxy-minecraft.conf"
 PANEL_CONF_NAME = "nomcproxy-pterodactyl.conf"
+SITE_CONF_NAME = "02-nomcproxy-site.conf"
+OLD_SITE_CONF_NAMES = ("nomcproxy-site.conf", "##-nomcproxy-site.conf")
 WINGS_CONF_NAME = "nomcproxy-wings.conf"
 SFTP_CONF_NAME = "nomcproxy-sftp.conf"
 LISTEN_PORT = 25565
@@ -519,6 +521,101 @@ def acme_client_name(domain: str) -> str:
     return re.sub(r"[^A-Za-z0-9]", "_", domain)
 
 
+def php_fpm_sock() -> str | None:
+    """First PHP-FPM socket found, preferring newer versions."""
+    candidates = []
+    for root in (Path("/run/php"), Path("/var/run/php")):
+        if not root.is_dir():
+            continue
+        candidates.extend(root.glob("php*-fpm.sock"))
+    if not candidates:
+        return None
+    return str(sorted(candidates, reverse=True)[0])
+
+
+def site_root(apex: str) -> Path:
+    """Document root. Azuriom lives in public/; otherwise the site dir."""
+    base = Path("/var/www") / apex
+    public = base / "public"
+    if public.is_dir():
+        return public
+    return base
+
+
+def make_site_conf(apex: str, service: str) -> str:
+    """Local site for the apex. Matched by server_name, never the default.
+
+    Without this, the panel block is the only listen 443 and Angie sends
+    the apex to Pterodactyl. Do not set default_server: the host already
+    has a fallback (00-default.conf) and a second one is fatal. The
+    filename starts with 02- so it is included after 00- and 01-;
+    fallback; matching is by server_name, not by being the default.
+    """
+    root = site_root(apex)
+    name = acme_client_name(apex)
+    sock = php_fpm_sock()
+    if service == "angie":
+        if acme_client_defined(name):
+            acme = f"# reusing existing acme_client {name}\n"
+        else:
+            acme = f"""# ACME client for the public site. Edit the email, then: angie -t && systemctl reload angie
+acme_client {name}
+    https://acme-v02.api.letsencrypt.org/directory
+    challenge=http
+    email=you@example.com
+    renew_before_expiry=30d;
+
+"""
+        ssl = (
+            f"    acme {name};\n"
+            f"    ssl_certificate $acme_cert_{name};\n"
+            f"    ssl_certificate_key $acme_cert_key_{name};\n"
+        )
+    else:
+        acme = ""
+        ssl = (
+            f"    ssl_certificate /etc/letsencrypt/live/{apex}/fullchain.pem;\n"
+            f"    ssl_certificate_key /etc/letsencrypt/live/{apex}/privkey.pem;\n"
+        )
+    php = ""
+    if sock:
+        php = f"""
+    location ~ \\.php$ {{
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+        fastcgi_pass unix:{sock};
+    }}
+"""
+    return f"""# Managed by nomcproxy — do not edit by hand
+# role: site
+# Public website for {apex}. The panel is panel.{apex}.
+# Azuriom: extract it here so root is {root} (…/public once installed).
+{acme}server {{
+    listen 80;
+    server_name {apex} www.{apex};
+    return 301 https://$host$request_uri;
+}}
+
+server {{
+    listen 443 ssl;
+    server_name {apex} www.{apex};
+{ssl}    root {root};
+    index index.php index.html;
+    client_max_body_size 100m;
+
+    location / {{
+        try_files $uri $uri/ /index.php?$query_string;
+    }}
+    location = /favicon.ico {{ access_log off; log_not_found off; }}
+    location = /robots.txt  {{ access_log off; log_not_found off; }}
+    error_page 404 /index.php;
+{php}    location ~ /\\.(?!well-known).* {{
+        deny all;
+    }}
+}}
+"""
+
+
 def make_panel_conf(upstream: str, domain: str, service: str, dynamic: bool) -> str:
     """HTTP virtual host for the panel. Does not listen as a raw TCP 443 grab."""
     name = acme_client_name(domain)
@@ -623,6 +720,40 @@ def cname_warnings(apex: str, *hosts: str) -> list[str]:
         if wan is None or ip != wan:
             missing.append(host)
     return missing
+
+
+def write_site_conf(apex: str, service: str) -> Path:
+    conf_dir_path = panel_conf_dir(service)
+    conf_dir_path.mkdir(parents=True, exist_ok=True)
+    for old_name in OLD_SITE_CONF_NAMES:
+        old_path = conf_dir_path / old_name
+        if old_path.is_file():
+            old_path.unlink()
+            log.info("Removed old site conf %s", old_path)
+    path = conf_dir_path / SITE_CONF_NAME
+    path.write_text(make_site_conf(apex, service))
+    os.chmod(path, 0o644)
+    log.info("Wrote site virtual host %s (server_name %s, root %s)", path, apex, site_root(apex))
+    return path
+
+
+def other_http_servers(service: str, apex: str) -> list[str]:
+    """Other confs that name the apex or panel host. Those can steal the request."""
+    conf_dir_path = panel_conf_dir(service)
+    if not conf_dir_path.is_dir():
+        return []
+    ours = {PANEL_CONF_NAME, SITE_CONF_NAME, *OLD_SITE_CONF_NAMES}
+    hits = []
+    for path in sorted(conf_dir_path.glob("*.conf")):
+        if path.name in ours:
+            continue
+        try:
+            text = path.read_text()
+        except OSError:
+            continue
+        if apex in text or f"panel.{apex}" in text:
+            hits.append(str(path))
+    return hits
 
 
 def write_panel_conf(upstream: str, domain: str, service: str, dynamic: bool) -> Path:
@@ -737,6 +868,8 @@ def write_conf(upstream: str, comment: str = "", panel_domain: str | None = None
     conf_path = write_minecraft_conf(upstream, service, dynamic, comment)
     if panel_domain:
         write_panel_conf(upstream, panel_domain, service, dynamic)
+        apex = panel_domain[len("panel."):] if panel_domain.startswith("panel.") else panel_domain
+        write_site_conf(apex, service)
         write_stream_conf(
             upstream, service, dynamic, WINGS_CONF_NAME, WINGS_PORT, WINGS_PORT, "wings", comment
         )

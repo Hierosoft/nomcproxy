@@ -682,3 +682,16 @@ Ok we don't have to look into that further. Just explain some brief info about t
 
 On the target machine, cd install-on-target-only && ./install-pterodactyl-instead.py (with --blightfall --admin-email --public-domain --proxy-ip options) says:
 - paste error regarding missing function detect_firewall
+
+- 2026-10-24
+
+On the proxy, panel.[redacted].com isn't going to pterodactyl, [redacted].com is. I still want [redacted].com to forward to the home server, unless there is a way to connect azuriom to minecraft by installing azuriom on the proxy instead of target, but I want panel.[redacted].com to go to pterodactyl. Even after re-running install on the proxy, I have:
+- paste angie domain conf that doesn't define domain and subdomain separately (nor in separate files)
+
+You don't have to keep giving me a zip. The Canvas download feature is fully working now.
+- paste error regarding duplicate default server (redefinition of default_server, apparently)
+
+Keep in mind that my angie config has a fallback site in case someone types an address that points to the server but doesn't have an angie conf, and I want to retain this (don't edit this file) apart from the apex site (which we should explicitly filter for; using ##- at the start of the file to ensure filtering order if necessary):
+- paste 00-default.conf (correct place for default_server in this case)
+
+You should make sure we name order-dependent angie conf files an actual numerical prefix like "00-" not literally "##-"
