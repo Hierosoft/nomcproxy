@@ -218,3 +218,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Domain-specific files are generated at install time, not committed.
+nomcproxy-certsync.path
+nomcproxy-certsync.service
+*.env
+settings.json

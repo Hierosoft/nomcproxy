@@ -22,7 +22,7 @@ PANEL_CONF_NAME = "nomcproxy-pterodactyl.conf"
 SITE_CONF_NAME = "02-nomcproxy-site.conf"
 OLD_SITE_CONF_NAMES = ("nomcproxy-site.conf", "##-nomcproxy-site.conf")
 WINGS_CONF_NAME = "nomcproxy-wings.conf"
-SFTP_CONF_NAME = "nomcproxy-sftp.conf"
+NODE_CERT_CONF_NAME = "nomcproxy-node-cert.conf"
 LISTEN_PORT = 25565
 BACKEND_PORT = 25565
 WINGS_PORT = 8080
@@ -722,7 +722,54 @@ server {{
 """
 
 
-def acme_client_defined(name: str, exclude: Path | None = None) -> bool:
+def make_node_cert_conf(node_host: str, email: str) -> str:
+    """Server block whose only job is to make Angie issue the node cert.
+
+    Wings terminates TLS itself with a copy of this cert. The block
+    listens on 80 so the HTTP-01 challenge works, and on 443 so Angie
+    actually requests and renews the certificate for this name.
+    """
+    name = acme_client_name(node_host)
+    if acme_client_defined(name, exclude=Path("/etc/angie/http.d") / NODE_CERT_CONF_NAME):
+        acme = f"# reusing existing acme_client {name}\n"
+    else:
+        acme = acme_block(name, email)
+    return f"""# Managed by nomcproxy — do not edit by hand
+# role: node-cert
+# Holds the cert that is copied to Wings. Not a public site.
+# acme client: {name}
+{acme}server {{
+    listen 80;
+    server_name {node_host};
+    acme {name};
+    location / {{
+        return 404;
+    }}
+}}
+
+server {{
+    {listen_443("angie")}
+    server_name {node_host};
+    acme {name};
+    ssl_certificate $acme_cert_{name};
+    ssl_certificate_key $acme_cert_key_{name};
+    access_log /var/log/angie/{name}.log main;
+    error_log /var/log/angie/{name}.err info;
+    location / {{
+        return 404;
+    }}
+}}
+"""
+
+
+def write_node_cert_conf(node_host: str, email: str) -> Path:
+    conf_dir_path = Path("/etc/angie/http.d")
+    conf_dir_path.mkdir(parents=True, exist_ok=True)
+    path = conf_dir_path / NODE_CERT_CONF_NAME
+    path.write_text(make_node_cert_conf(node_host, email))
+    os.chmod(path, 0o644)
+    log.info("Wrote node cert host %s (server_name %s)", path, node_host)
+    return path
     """True if some other conf defines this acme_client (not a comment).
 
     Looks in http.d, conf.d, local/, and the main conf. Skips the file
@@ -968,6 +1015,9 @@ def write_conf(upstream: str, comment: str = "", panel_domain: str | None = None
         write_panel_conf(upstream, panel_domain, service, dynamic, email)
         apex = panel_domain[len("panel."):] if panel_domain.startswith("panel.") else panel_domain
         write_site_conf(apex, service, email)
+        if service == "angie":
+            node_host = "node." + apex
+            write_node_cert_conf(node_host, email)
         write_stream_conf(
             upstream, service, dynamic, WINGS_CONF_NAME, WINGS_PORT, WINGS_PORT, "wings", comment
         )

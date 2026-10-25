@@ -1218,7 +1218,59 @@ def install_panel(state: ServerInstallState, public_domain: str, proxy_ip: str) 
     return 0
 
 
-def docker_present() -> bool:
+def prepare_certsync_user() -> int:
+    """Create the certsync user, ssl dir, and sudoers. The proxy's key is added by hand."""
+    import pwd
+    try:
+        pwd.getpwnam("certsync")
+        print("User certsync already exists")
+    except KeyError:
+        rc = run(["useradd", "--system", "--create-home", "--shell", "/usr/sbin/nologin", "certsync"])
+        if rc != 0:
+            return rc
+    ssl_dir = Path("/etc/pterodactyl/ssl")
+    ssl_dir.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["chown", "certsync:certsync", str(ssl_dir)], check=True)
+    ssl_dir.chmod(0o750)
+    ssh_dir = Path("/home/certsync/.ssh")
+    ssh_dir.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["chown", "-R", "certsync:certsync", "/home/certsync"], check=True)
+    ssh_dir.chmod(0o700)
+    auth = ssh_dir / "authorized_keys"
+    if not auth.exists():
+        auth.touch()
+    auth.chmod(0o600)
+    subprocess.run(["chown", "certsync:certsync", str(auth)], check=True)
+    sudoers = Path("/etc/sudoers.d/certsync-wings")
+    sudoers.write_text(
+        "certsync ALL=(root) NOPASSWD: /bin/systemctl reload wings, "
+        "/bin/systemctl restart wings\n"
+    )
+    sudoers.chmod(0o440)
+    print("certsync user ready. Add the proxy's public key to")
+    print(f"  {auth}")
+    print("Wings cert paths: /etc/pterodactyl/ssl/fullchain.pem and privkey.pem")
+    return 0
+
+
+def point_wings_at_synced_cert() -> int:
+    """If Wings is configured, point it at the cert Angie manages and we copy."""
+    if not WINGS_CONF_PATH.is_file():
+        return 0
+    text = WINGS_CONF_PATH.read_text()
+    cert = "/etc/pterodactyl/ssl/fullchain.pem"
+    key = "/etc/pterodactyl/ssl/privkey.pem"
+    text2 = re.sub(r"(?m)^(\s*)enabled:\s*\S+", r"\1enabled: true", text, count=1)
+    text2 = re.sub(r"(?m)^(\s*)cert:\s*\S+", rf"\1cert: {cert}", text2, count=1)
+    text2 = re.sub(r"(?m)^(\s*)key:\s*\S+", rf"\1key: {key}", text2, count=1)
+    if text2 == text:
+        print("Wings config already points at the synced cert")
+        return 0
+    WINGS_CONF_PATH.write_text(text2)
+    print(f"Pointed Wings SSL at {cert}")
+    if is_service_active("wings"):
+        return run(["systemctl", "restart", "wings"])
+    return 0
     """True if the docker CLI exists or the docker unit is active/enabled."""
     if shutil.which("docker"):
         return True
@@ -1472,6 +1524,13 @@ def main() -> int:
             return rc
 
         rc = ensure_wings(state, args.public_domain)
+        if rc != 0:
+            return rc
+
+        rc = prepare_certsync_user()
+        if rc != 0:
+            return rc
+        rc = point_wings_at_synced_cert()
         if rc != 0:
             return rc
 

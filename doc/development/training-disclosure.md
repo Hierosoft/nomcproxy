@@ -728,11 +728,11 @@ We never actually define the new acme client starting with panel_:
 
 - 2026-10-24
 
-If the panel_kul_hakai_com isn't defined in a file we don't generate, we must require an --email-address arg to define it correctly instead of using `email=you@example.com`
+If the panel_redacted_example_com isn't defined in a file we don't generate, we must require an --email-address arg to define it correctly instead of using `email=you@example.com`
 
 - 2026-10-24
 
-I put the Azuriom web-based installer in /var/www/kul-hakai.com but the page says url rewriting is not enabled. Adjust the way we write the apex site's conf to meet the requirements. See https://azuriom.com/en/docs/faq
+I put the Azuriom web-based installer in /var/www/redacted-example.com but the page says url rewriting is not enabled. Adjust the way we write the apex site's conf to meet the requirements. See https://azuriom.com/en/docs/faq
 
 should I use 'user'@'%' or 'user'@'localhost' for user in mariadb on racknerd vps?
 
@@ -786,3 +786,30 @@ You said not to put the public IP nor private IP in allocations, but https://doc
 - The answer is put the LAN IP of the target there, but use public mc.* address of proxy as the alias.
 
 All of these questions I've been asking regarding manual steps in the web GUI etc should be spelled out as instructions after install complete (with skips or not) except for instructions which can be detected as done and are done.
+
+- 2026-10-25
+
+Creating a server with the discussed settings says "Could not establish a connection to the machine running this server. Please try again."
+
+Do we really have to set Use SSL to no?
+- show output of `systemctl status wings --no-pager`, `ss -lntp | grep 8080`, and `grep -A5 '^api:' /etc/pterodactyl/config.yml`
+
+Wings itself cannot generally have a valid cert for node.example.com because it doesn't run on the proxy and the proxy's angie handles the cert. Should we download it using a cron job, or is leaving SSL off ok?
+
+Is pushing the certs down normal? This seems convoluted. Why can't we install pterydactyl on the proxy?
+
+Why can't we put wings on the home server and pterodactyl on the proxy? That seems like it would make more sense.
+
+So can we turn off SSL without any disadvantages?
+
+Let's discuss the "This seems convoluted" point a little more. Does everyone with pterydactyl who is hiding the IP address of Minecraft (and not putting panel subdomain on private IP either) really transfer certs to make this all work?
+
+So is there *any* common case for hiding the Minecraft IP (including indirect revealing or leakage to browser frontend or Minecraft that may occur via accessing pterydactyl or Azuriom as non-priveleged)? Can I get a Minecraft host that will just host the proxy (but in more sophisticated way, such as Geyser and possibly Floodgate)?
+
+Ok lets focus on automating cert transfer. I'll add a public key of the the user you specify to the authorized users on the home server. Lets use rsync to avoid redundant file overwrites, but if possible, do this when angie renews if we can hook into that event without a custom build of angie.
+
+Automate the setup. Make sure the actual cert managed by angie is used. If a pem is necessary, generate it from angie crt & key if necessary.
+
+During install we must generate the nomcproxy-certsync.path file and any other file(s) that contain the website name. Never save anything with redacted_example or redacted-example etc to the repo. Typically use our json system, but if other users than root need info, save in the repo (and add to .gitignore) and make it readable by necessary user(s), worst case put it in /opt/.config/, best case in ~/.config of appropriate user (even if user is www-data). If user who needs it is root, stick with our json file(s).
+
+It is ok to use /etc/nomcproxy/certsync.env to fill in gaps. Stick with that if it makes sense for run-time (along with json for remembering last used install-time options)

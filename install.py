@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import subprocess
 import sys
 from collections import OrderedDict
 from pathlib import Path
@@ -185,6 +186,97 @@ def print_completion_guide(apex: str, target_server: str) -> None:
     print(f"    --panel-url https://{panel} --token <token> --node 1")
     print("  systemctl start wings")
     print(bar)
+
+
+def setup_certsync(apex: str, target_server: str) -> None:
+    """Install the Angie to Wings cert push. Domain lives in settings.json only."""
+    node_host = "node." + apex
+    client = nomcproxy.acme_client_name(node_host)
+    script_src = Path(__file__).resolve().parent / "sync-wings-cert.sh"
+    script_dst = Path("/usr/local/sbin/nomcproxy-certsync")
+    key_path = Path("/root/.ssh/nomcproxy-certsync")
+    unit_dir = Path("/etc/systemd/system")
+
+    if not script_src.is_file():
+        echo0(f"Error: missing {script_src}")
+        return
+    script_dst.write_text(script_src.read_text())
+    script_dst.chmod(0o755)
+
+    key_path.parent.mkdir(parents=True, exist_ok=True)
+    if not key_path.is_file():
+        subprocess.run(
+            ["ssh-keygen", "-t", "ed25519", "-f", str(key_path), "-N", ""],
+            check=True,
+        )
+        print(f"Generated {key_path}")
+
+    settings = load_settings()
+    settings["node_host"] = node_host
+    settings["acme_client"] = client
+    settings["certsync_host"] = target_server
+    settings["certsync_user"] = "certsync"
+    settings["certsync_dir"] = "/etc/pterodactyl/ssl"
+    settings["certsync_key"] = str(key_path)
+    save_settings(settings)
+
+    env_path = Path("/etc/nomcproxy/certsync.env")
+    env_path.write_text(
+        f"NOMC_ACME_CLIENT={client}\n"
+        f"NOMC_CERTSYNC_HOST={target_server}\n"
+        f"NOMC_CERTSYNC_USER=certsync\n"
+        f"NOMC_CERTSYNC_DIR=/etc/pterodactyl/ssl\n"
+        f"NOMC_CERTSYNC_KEY={key_path}\n"
+    )
+    env_path.chmod(0o600)
+
+    cert_dir = f"/var/lib/angie/acme/{client}"
+    (unit_dir / "nomcproxy-certsync.service").write_text(
+        "[Unit]\n"
+        "Description=Push the Angie node cert to the home Wings host\n"
+        "After=network-online.target\n"
+        "\n"
+        "[Service]\n"
+        "Type=oneshot\n"
+        "EnvironmentFile=/etc/nomcproxy/certsync.env\n"
+        f"ExecStart={script_dst}\n"
+    )
+    (unit_dir / "nomcproxy-certsync.path").write_text(
+        "[Unit]\n"
+        "Description=Watch the Angie node cert and push it to Wings\n"
+        "\n"
+        "[Path]\n"
+        f"PathChanged={cert_dir}/certificate.pem\n"
+        f"PathChanged={cert_dir}/private.key\n"
+        "Unit=nomcproxy-certsync.service\n"
+        "\n"
+        "[Install]\n"
+        "WantedBy=multi-user.target\n"
+    )
+    subprocess.run(["systemctl", "daemon-reload"], check=True)
+    subprocess.run(
+        ["systemctl", "enable", "--now", "nomcproxy-certsync.path"], check=True
+    )
+    print(f"Cert sync watches {cert_dir}")
+    print("Runtime: /etc/nomcproxy/certsync.env")
+    print("Last install options: /etc/nomcproxy/settings.json")
+
+    print()
+    print("=" * 60)
+    print("One manual step: authorize certsync on the home server")
+    print("=" * 60)
+    print("On the home server, as root:")
+    print("  useradd --system --create-home --shell /usr/sbin/nologin certsync")
+    print("  install -d -o certsync -g certsync -m 750 /etc/pterodactyl/ssl")
+    print("  install -d -o certsync -g certsync -m 700 /home/certsync/.ssh")
+    print("  cat >> /home/certsync/.ssh/authorized_keys <<'EOF'")
+    print(key_path.with_suffix(".pub").read_text().rstrip())
+    print("EOF")
+    print("  echo 'certsync ALL=(root) NOPASSWD: /bin/systemctl reload wings, /bin/systemctl restart wings' \\")
+    print("    > /etc/sudoers.d/certsync-wings")
+    print("Then on this proxy: systemctl start nomcproxy-certsync.service")
+    print("Wings uses /etc/pterodactyl/ssl/fullchain.pem and privkey.pem.")
+    print("=" * 60)
 
 
 def print_target_next_steps(target: str, pterodactyl: bool) -> None:
@@ -391,6 +483,8 @@ def main() -> int:
     if names:
         apex, mc_host, panel_host = names
         node_host = "node." + apex
+        if service == "angie":
+            setup_certsync(apex, args.target_server)
         missing = nomcproxy.cname_warnings(apex, mc_host, panel_host, node_host)
         print_completion_guide(apex, args.target_server)
         if missing:
