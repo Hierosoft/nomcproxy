@@ -13,7 +13,9 @@ or dynamic hostname.
 When apt (or apt-get) is available, installs PHP 8.3 and the dependencies
 listed at https://docs.pterodactyl.io/v1/panel/getting-started and starts
 php8.3-fpm. Detects an existing web server (angie, nginx, apache2).
-If Pterodactyl is already installed, only egg/yolk guidance is performed.
+Also installs Docker and Wings, writes the systemd unit, and starts Wings
+if /etc/pterodactyl/config.yml already exists (created by the panel's
+Auto-Deploy command after a node is created).
 """
 
 from __future__ import annotations
@@ -42,6 +44,35 @@ WINGS_API_PORT = 8080
 WINGS_SFTP_PORT = 2022
 
 PANEL_DIR_PATH = Path("/var/www/pterodactyl")
+WINGS_BIN_PATH = Path("/usr/local/bin/wings")
+WINGS_CONF_DIR = Path("/etc/pterodactyl")
+WINGS_CONF_PATH = WINGS_CONF_DIR / "config.yml"
+WINGS_UNIT_PATH = Path("/etc/systemd/system/wings.service")
+WINGS_DOWNLOAD_URL = (
+    "https://github.com/pterodactyl/wings/releases/latest/download/wings_linux_amd64"
+)
+WINGS_UNIT = """\
+[Unit]
+Description=Pterodactyl Wings Daemon
+After=docker.service
+Requires=docker.service
+PartOf=docker.service
+
+[Service]
+User=root
+WorkingDirectory=/etc/pterodactyl
+LimitNOFILE=4096
+PIDFile=/var/run/wings/daemon.pid
+ExecStart=/usr/local/bin/wings
+Restart=on-failure
+StartLimitInterval=180
+StartLimitBurst=30
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
+"""
+
 CREDENTIALS_FILE_PATH = Path("/root/nomcproxy-pterodactyl-credentials.json")
 SETTINGS_PATH = Path("/root/nomcproxy-target-settings.json")
 PANEL_TARBALL_URL = "https://github.com/pterodactyl/panel/releases/latest/download/panel.tar.gz"
@@ -514,7 +545,7 @@ class ServerInstallState:
             print("Result: INCOMPLETE")
         else:
             print("Result: panel base install complete")
-            print("Still manual: import the egg, create the server, install Wings,")
+            print("Still manual: import the egg, create the node and server,")
             print("forward router ports, then run install.py --pterodactyl on the proxy.")
         print("=" * 60)
 
@@ -1102,6 +1133,168 @@ def install_panel(state: ServerInstallState, public_domain: str, proxy_ip: str) 
     return 0
 
 
+def docker_present() -> bool:
+    """True if the docker CLI exists or the docker unit is active/enabled."""
+    if shutil.which("docker"):
+        return True
+    return is_service_active("docker") or is_service_enabled("docker")
+
+
+def install_docker() -> int:
+    """Install Docker. Prefer the Debian docker.io package; fall back to get.docker.com."""
+    if docker_present():
+        print("Docker already present; skipping install")
+        if not is_service_enabled("docker"):
+            rc = run(["systemctl", "enable", "--now", "docker"])
+            if rc != 0:
+                return rc
+        elif not is_service_active("docker"):
+            rc = run(["systemctl", "start", "docker"])
+            if rc != 0:
+                return rc
+        return 0
+    print("Installing Docker (docker.io)...")
+    rc = run_apt(["install", "-y", "docker.io"])
+    if rc != 0:
+        print("docker.io unavailable; trying the official Docker install script...")
+        r = subprocess.run(
+            "curl -fsSL https://get.docker.com/ | CHANNEL=stable bash",
+            shell=True,
+        )
+        if r.returncode != 0:
+            echo0(f"Error: Docker install failed with exit code {r.returncode}")
+            return r.returncode
+    if not docker_present():
+        echo0("Error: Docker install finished but the docker command is still missing")
+        return 1
+    rc = run(["systemctl", "enable", "--now", "docker"])
+    if rc != 0:
+        return rc
+    if not is_service_active("docker"):
+        echo0("Error: docker.service did not become active")
+        _show_unit_errors("docker")
+        return 1
+    return 0
+
+
+def install_wings_binary() -> int:
+    """Download the Wings binary if it is missing."""
+    if WINGS_BIN_PATH.is_file() and os.access(WINGS_BIN_PATH, os.X_OK):
+        print(f"Wings binary already present at {WINGS_BIN_PATH}")
+        return 0
+    print(f"Downloading Wings to {WINGS_BIN_PATH}...")
+    WINGS_BIN_PATH.parent.mkdir(parents=True, exist_ok=True)
+    tmp = WINGS_BIN_PATH.with_suffix(".tmp")
+    try:
+        urllib.request.urlretrieve(WINGS_DOWNLOAD_URL, tmp)
+    except Exception as e:
+        echo0(f"Error: failed to download Wings: {e}")
+        return 1
+    tmp.chmod(0o755)
+    tmp.replace(WINGS_BIN_PATH)
+    if not WINGS_BIN_PATH.is_file():
+        echo0(f"Error: Wings binary missing after download ({WINGS_BIN_PATH})")
+        return 1
+    print(f"Installed Wings binary at {WINGS_BIN_PATH}")
+    return 0
+
+
+def write_wings_unit() -> int:
+    """Write the systemd unit if it is missing. Do not overwrite an existing one."""
+    if WINGS_UNIT_PATH.is_file():
+        print(f"Wings unit already exists at {WINGS_UNIT_PATH}")
+        return 0
+    try:
+        WINGS_UNIT_PATH.write_text(WINGS_UNIT)
+        WINGS_UNIT_PATH.chmod(0o644)
+    except OSError as e:
+        echo0(f"Error: failed to write {WINGS_UNIT_PATH}: {e}")
+        return 1
+    print(f"Wrote Wings unit {WINGS_UNIT_PATH}")
+    rc = run(["systemctl", "daemon-reload"])
+    return rc
+
+
+def _show_unit_errors(unit: str) -> None:
+    """Print recent journal lines and systemctl status for a failed unit."""
+    echo0(f"--- systemctl status {unit} ---")
+    subprocess.run(["systemctl", "status", unit, "--no-pager", "-l"])
+    echo0(f"--- journalctl -u {unit} (last 40 lines) ---")
+    subprocess.run(["journalctl", "-u", unit, "-n", "40", "--no-pager"])
+
+
+def ensure_wings(state: ServerInstallState, public_domain: str) -> int:
+    """Install Docker and Wings, write the unit, enable it, and start it if configured.
+
+    Wings cannot start until a node exists and `wings configure` has written
+    config.yml. If that file is missing, install everything else and explain
+    the remaining manual step instead of failing the whole install.
+    """
+    print()
+    print("=" * 60)
+    print("Wings")
+    print("=" * 60)
+
+    rc = install_docker()
+    if rc != 0:
+        state.record("docker", "failed")
+        return rc
+    state.record("docker", "done")
+
+    rc = install_wings_binary()
+    if rc != 0:
+        state.record("wings binary", "failed")
+        return rc
+    state.record("wings binary", "done")
+
+    WINGS_CONF_DIR.mkdir(parents=True, exist_ok=True)
+
+    rc = write_wings_unit()
+    if rc != 0:
+        state.record("wings unit", "failed")
+        return rc
+    state.record("wings unit", "done")
+
+    if not is_service_enabled("wings"):
+        rc = run(["systemctl", "enable", "wings"])
+        if rc != 0:
+            state.record("wings enable", "failed")
+            return rc
+        state.record("wings enable", "done")
+    else:
+        print("wings.service already enabled")
+        state.record("wings enable", "skipped")
+
+    if not WINGS_CONF_PATH.is_file():
+        panel = "panel." + public_domain
+        print()
+        print("Wings is installed but not configured, so it was not started.")
+        print("config.yml is created by the panel's Auto-Deploy command after")
+        print("you create a node. On this machine, after the node exists:")
+        print(f"  cd /etc/pterodactyl && wings configure \\")
+        print(f"    --panel-url https://{panel} --token <token> --node 1")
+        print("Use the panel subdomain, not the apex and not port 8443.")
+        print("Then: systemctl start wings")
+        state.record("wings start", "skipped (not configured)")
+        return 0
+
+    if is_service_active("wings"):
+        print("wings.service is already running")
+        state.record("wings start", "skipped")
+        return 0
+
+    print("Starting wings.service...")
+    rc = run(["systemctl", "start", "wings"])
+    if rc != 0 or not is_service_active("wings"):
+        echo0("Error: wings.service did not become active")
+        _show_unit_errors("wings")
+        state.record("wings start", "failed")
+        return rc or 1
+    print("wings.service is active")
+    state.record("wings start", "done")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Install or configure Pterodactyl on the private server",
@@ -1190,6 +1383,10 @@ def main() -> int:
         # install_panel skips steps that are already done (panel files, DB, etc.)
         # and still creates the admin user if it was never validated.
         rc = install_panel(state, args.public_domain, args.proxy_ip)
+        if rc != 0:
+            return rc
+
+        rc = ensure_wings(state, args.public_domain)
         if rc != 0:
             return rc
 

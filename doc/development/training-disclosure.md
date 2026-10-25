@@ -733,3 +733,49 @@ If the panel_kul_hakai_com isn't defined in a file we don't generate, we must re
 - 2026-10-24
 
 I put the Azuriom web-based installer in /var/www/kul-hakai.com but the page says url rewriting is not enabled. Adjust the way we write the apex site's conf to meet the requirements. See https://azuriom.com/en/docs/faq
+
+should I use 'user'@'%' or 'user'@'localhost' for user in mariadb on racknerd vps?
+
+Azuriom installation says (with redactions by me):
+ An error occurred: SQLSTATE[HY000] [1045] Access denied for user 'redacted'@'localhost' (using password: YES)
+Database
+Type: MySQL/MariaDB
+Host: localhost
+Port: 3306
+Database: redacted_db
+User: redacted
+Password: redacted_password
+
+I can't login in the terminal even. What if the password starts with "*", contains "\G" and contains "^" but is single quoted in the IDENTIFIED BY clause? Do we still need to simplify it?
+- The answer is that the backslash is the problem.
+
+Ok, fixed. However, what version of Azuriom do I need for compatibility with Blightfall?
+
+During Azuriom setup, "Login with Microsoft account" Yes or No? Yes requires UUID. You said MS integration isn't complete for 1.7.10? But if that is true I don't know if it matters for the site (player login, my admin login).
+- The answer is Yes, but 1.7.10 won't have integration (Azuriom can't send anything to AzLink that is that old)
+
+I entered the hyphenated UUID for the admin UUID. Is that ok? If I click Profile it shows the non-hyphenated one. If the admin setting worked, how do I get to the site settings? If not, how do I fix it with sql commands?
+
+Odd, I am Redacted_, have role 1, role 2 for redacted for some reason (I thought redacted was my visible name), and get 403 forbidden for the admin routes.
+- paste output of select commands below
+- the answer is UPDATE users SET role_id = 2 WHERE id = ...;
+  - replacing "..." with id from `SELECT id, name, email, game_id, role_id FROM users;` assuming a role with is_admin is 2 in: `SELECT id, name, is_admin FROM roles;`
+
+Ok, it works. Lets get back to what settings I should use for New Node in pterodactyl, considering our setup.
+
+Are you sure we should say behind proxy with our setup? We are using racknerd VPS as proxy, not Cloudflare etc.
+
+should Node Visibility be public or private? And isn't naming it proxy both vague and confusing since we are proxied not the proxy per se (where we are actually saving the setting, as opposed to the public address we are using to access the panel)?
+- answers are: 1. Public. 2. Name it whatever the server name is (all small letters, hyphens not spaces).
+
+how much disk space should I allocate
+
+Ok, now it opens to the allocations tab. Do i need to add the private ip there?
+
+Why doesn't /etc/pterodactyl on the target machine even though pterodactyl is running on the target machine? Did we do something wrong? Should pterodactyl run on the proxy? The one-step command using the generate token button starts with cd /etc/pterodactyl
+
+But the auto deploy command doesn't create the dir nor install wings, it starts with `cd /etc/pterodactyl && sudo wings configure --panel-url https://example.com:8443` ...
+
+- paste output of install
+
+We should automate checking for wings, installing wings deps, installing wings, checking if the unit exists, checking if the unit is enabled, and creating the unit if not, checking if it is running, starting it if not, then seeing if starting it worked and showing the error(s) if not.
