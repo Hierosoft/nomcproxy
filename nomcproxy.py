@@ -580,12 +580,14 @@ def php_fpm_sock() -> str | None:
 
 
 def site_root(apex: str) -> Path:
-    """Document root. Azuriom lives in public/; otherwise the site dir."""
-    base = Path("/var/www") / apex
-    public = base / "public"
-    if public.is_dir():
-        return public
-    return base
+    """Document root. Azuriom requires this to end in /public.
+
+    Their installer reports "URL rewriting is not enabled" unless root
+    is the public directory. Always use that path; create it if missing.
+    """
+    public = Path("/var/www") / apex / "public"
+    public.mkdir(parents=True, exist_ok=True)
+    return public
 
 
 def make_site_conf(apex: str, service: str, email: str = "") -> str:
@@ -628,7 +630,8 @@ def make_site_conf(apex: str, service: str, email: str = "") -> str:
     return f"""# Managed by nomcproxy — do not edit by hand
 # role: site
 # Public website for {apex}. The panel is panel.{apex}.
-# Azuriom: extract it here so root is {root} (…/public once installed).
+# Azuriom requires root to end in /public or it reports URL rewriting off.
+# https://azuriom.com/docs/faq
 {acme}server {{
     listen 80;
     server_name {apex} www.{apex};
@@ -639,8 +642,13 @@ server {{
     {listen_443(service)}
     server_name {apex} www.{apex};
 {ssl}    root {root};
-    index index.php index.html;
+    index index.php index.html index.htm;
+    charset utf-8;
     client_max_body_size 100m;
+
+    add_header X-Frame-Options "SAMEORIGIN";
+    add_header X-Content-Type-Options "nosniff";
+    add_header Referrer-Policy "strict-origin-when-cross-origin";
 
     location / {{
         try_files $uri $uri/ /index.php?$query_string;

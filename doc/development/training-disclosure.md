@@ -729,3 +729,7 @@ We never actually define the new acme client starting with panel_:
 - 2026-10-24
 
 If the panel_kul_hakai_com isn't defined in a file we don't generate, we must require an --email-address arg to define it correctly instead of using `email=you@example.com`
+
+- 2026-10-24
+
+I put the Azuriom web-based installer in /var/www/kul-hakai.com but the page says url rewriting is not enabled. Adjust the way we write the apex site's conf to meet the requirements. See https://azuriom.com/en/docs/faq
