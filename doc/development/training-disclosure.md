@@ -824,3 +824,5 @@ Traceback (most recent call last):
            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 AttributeError: module 'nomcproxy' has no attribute 'acme_client_defined'. Did you mean: 'acme_client_name'?
 ```
+
+On proxy I get Error: name 'SFTP_CONF_NAME' is not defined

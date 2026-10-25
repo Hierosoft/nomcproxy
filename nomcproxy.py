@@ -22,6 +22,7 @@ PANEL_CONF_NAME = "nomcproxy-pterodactyl.conf"
 SITE_CONF_NAME = "02-nomcproxy-site.conf"
 OLD_SITE_CONF_NAMES = ("nomcproxy-site.conf", "##-nomcproxy-site.conf")
 WINGS_CONF_NAME = "nomcproxy-wings.conf"
+SFTP_CONF_NAME = "nomcproxy-sftp.conf"
 NODE_CERT_CONF_NAME = "nomcproxy-node-cert.conf"
 LISTEN_PORT = 25565
 BACKEND_PORT = 25565
