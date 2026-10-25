@@ -770,6 +770,9 @@ def write_node_cert_conf(node_host: str, email: str) -> Path:
     os.chmod(path, 0o644)
     log.info("Wrote node cert host %s (server_name %s)", path, node_host)
     return path
+
+
+def acme_client_defined(name: str, exclude: Path | None = None) -> bool:
     """True if some other conf defines this acme_client (not a comment).
 
     Looks in http.d, conf.d, local/, and the main conf. Skips the file

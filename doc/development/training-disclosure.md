@@ -813,3 +813,14 @@ Automate the setup. Make sure the actual cert managed by angie is used. If a pem
 During install we must generate the nomcproxy-certsync.path file and any other file(s) that contain the website name. Never save anything with redacted_example or redacted-example etc to the repo. Typically use our json system, but if other users than root need info, save in the repo (and add to .gitignore) and make it readable by necessary user(s), worst case put it in /opt/.config/, best case in ~/.config of appropriate user (even if user is www-data). If user who needs it is root, stick with our json file(s).
 
 It is ok to use /etc/nomcproxy/certsync.env to fill in gaps. Stick with that if it makes sense for run-time (along with json for remembering last used install-time options)
+
+```
+Traceback (most recent call last):
+  File "/opt/git/nomcproxy/./install.py", line 504, in <module>
+    sys.exit(main())
+             ~~~~^^
+  File "/opt/git/nomcproxy/./install.py", line 427, in main
+    if not nomcproxy.acme_client_defined(panel_client, exclude=generated):
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'nomcproxy' has no attribute 'acme_client_defined'. Did you mean: 'acme_client_name'?
+```
