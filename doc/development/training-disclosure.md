@@ -725,3 +725,7 @@ Do we really need this php vulnerability workaround in the latest version of ang
 
 We never actually define the new acme client starting with panel_:
 - paste error missing panel_redacted_com acme client
+
+- 2026-10-24
+
+If the panel_kul_hakai_com isn't defined in a file we don't generate, we must require an --email-address arg to define it correctly instead of using `email=you@example.com`

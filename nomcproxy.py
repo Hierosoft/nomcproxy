@@ -521,6 +521,23 @@ def acme_client_name(domain: str) -> str:
     return re.sub(r"[^A-Za-z0-9]", "_", domain)
 
 
+def acme_block(name: str, email: str) -> str:
+    """acme_client definition. email is required; no placeholder."""
+    if not email or "@" not in email:
+        raise ValueError(
+            f"Error: --email-address is required to define acme_client {name}"
+        )
+    return f"""acme_client {name}
+    https://acme-v02.api.letsencrypt.org/directory
+    challenge=http
+    email={email}
+    renew_before_expiry=30d;
+
+"""
+    """Angie acme_client identifier: non-alphanumeric → underscore."""
+    return re.sub(r"[^A-Za-z0-9]", "_", domain)
+
+
 def ssl_already_on_443(service: str) -> bool:
     """True if some other conf already sets ssl on the shared 443 socket.
 
@@ -571,7 +588,7 @@ def site_root(apex: str) -> Path:
     return base
 
 
-def make_site_conf(apex: str, service: str) -> str:
+def make_site_conf(apex: str, service: str, email: str = "") -> str:
     """Local site for the apex. Matched by server_name, never the default.
 
     Without this, the panel block is the only listen 443 and Angie sends
@@ -587,14 +604,7 @@ def make_site_conf(apex: str, service: str) -> str:
         if acme_client_defined(name, exclude=Path("/etc/angie/http.d") / SITE_CONF_NAME):
             acme = f"# reusing existing acme_client {name}\n"
         else:
-            acme = f"""# ACME client for the public site. Edit the email, then: angie -t && systemctl reload angie
-acme_client {name}
-    https://acme-v02.api.letsencrypt.org/directory
-    challenge=http
-    email=you@example.com
-    renew_before_expiry=30d;
-
-"""
+            acme = acme_block(name, email)
         ssl = (
             f"    acme {name};\n"
             f"    ssl_certificate $acme_cert_{name};\n"
@@ -645,21 +655,14 @@ server {{
 """
 
 
-def make_panel_conf(upstream: str, domain: str, service: str, dynamic: bool) -> str:
+def make_panel_conf(upstream: str, domain: str, service: str, dynamic: bool, email: str = "") -> str:
     """HTTP virtual host for the panel. Does not listen as a raw TCP 443 grab."""
     name = acme_client_name(domain)
     if service == "angie":
         if acme_client_defined(name, exclude=Path("/etc/angie/http.d") / PANEL_CONF_NAME):
             acme = f"# reusing existing acme_client {name}\n"
         else:
-            acme = f"""# ACME client for this domain. Edit the email, then: angie -t && systemctl reload angie
-acme_client {name}
-    https://acme-v02.api.letsencrypt.org/directory
-    challenge=http
-    email=you@example.com
-    renew_before_expiry=30d;
-
-"""
+            acme = acme_block(name, email)
         ssl = (
             f"    acme {name};\n"
             f"    ssl_certificate $acme_cert_{name};\n"
@@ -769,7 +772,7 @@ def cname_warnings(apex: str, *hosts: str) -> list[str]:
     return missing
 
 
-def write_site_conf(apex: str, service: str) -> Path:
+def write_site_conf(apex: str, service: str, email: str = "") -> Path:
     conf_dir_path = panel_conf_dir(service)
     conf_dir_path.mkdir(parents=True, exist_ok=True)
     for old_name in OLD_SITE_CONF_NAMES:
@@ -778,7 +781,7 @@ def write_site_conf(apex: str, service: str) -> Path:
             old_path.unlink()
             log.info("Removed old site conf %s", old_path)
     path = conf_dir_path / SITE_CONF_NAME
-    path.write_text(make_site_conf(apex, service))
+    path.write_text(make_site_conf(apex, service, email))
     os.chmod(path, 0o644)
     log.info("Wrote site virtual host %s (server_name %s, root %s)", path, apex, site_root(apex))
     return path
@@ -803,11 +806,11 @@ def other_http_servers(service: str, apex: str) -> list[str]:
     return hits
 
 
-def write_panel_conf(upstream: str, domain: str, service: str, dynamic: bool) -> Path:
+def write_panel_conf(upstream: str, domain: str, service: str, dynamic: bool, email: str = "") -> Path:
     conf_dir_path = panel_conf_dir(service)
     conf_dir_path.mkdir(parents=True, exist_ok=True)
     path = conf_dir_path / PANEL_CONF_NAME
-    path.write_text(make_panel_conf(upstream, domain, service, dynamic))
+    path.write_text(make_panel_conf(upstream, domain, service, dynamic, email))
     os.chmod(path, 0o644)
     log.info(
         "Wrote panel virtual host %s (server_name %s → %s:%s)",
@@ -939,7 +942,7 @@ def reload_service(service: str) -> None:
         raise
 
 
-def write_conf(upstream: str, comment: str = "", panel_domain: str | None = None, dynamic: bool = False) -> tuple[Path, str]:
+def write_conf(upstream: str, comment: str = "", panel_domain: str | None = None, dynamic: bool = False, email: str = "") -> tuple[Path, str]:
     """Write Minecraft stream conf and, if a domain is given, the panel vhost."""
     service = active_service()
     if service == "angie":
@@ -954,9 +957,9 @@ def write_conf(upstream: str, comment: str = "", panel_domain: str | None = None
                 log.info("Removed stray nginx conf %s", stray)
     conf_path = write_minecraft_conf(upstream, service, dynamic, comment)
     if panel_domain:
-        write_panel_conf(upstream, panel_domain, service, dynamic)
+        write_panel_conf(upstream, panel_domain, service, dynamic, email)
         apex = panel_domain[len("panel."):] if panel_domain.startswith("panel.") else panel_domain
-        write_site_conf(apex, service)
+        write_site_conf(apex, service, email)
         write_stream_conf(
             upstream, service, dynamic, WINGS_CONF_NAME, WINGS_PORT, WINGS_PORT, "wings", comment
         )
@@ -966,7 +969,7 @@ def write_conf(upstream: str, comment: str = "", panel_domain: str | None = None
     return conf_path, service
 
 
-def apply_target_server(target_server: str, panel_domain: str | None = None) -> str:
+def apply_target_server(target_server: str, panel_domain: str | None = None, email: str = "") -> str:
     """Write confs for the Minecraft server's hostname or IP.
 
     Hostnames are re-resolved by the web server.
@@ -983,7 +986,7 @@ def apply_target_server(target_server: str, panel_domain: str | None = None) -> 
         assert_not_self(target_server, "target server")
     set_pterodactyl_domain(panel_domain)
     conf_path, service = write_conf(
-        target_server, f"Upstream: {target_server}", panel_domain, dynamic=dynamic
+        target_server, f"Upstream: {target_server}", panel_domain, dynamic=dynamic, email=email
     )
     log.info(
         "Wrote conf %s → %s (service=%s, re-resolve=%s)",

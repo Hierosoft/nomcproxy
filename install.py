@@ -243,6 +243,9 @@ def example_from_settings() -> str:
     domain = saved.get("pterodactyl_domain")
     if domain:
         parts.append(f"--pterodactyl-domain {domain}")
+    email = saved.get("email_address")
+    if email:
+        parts.append(f"--email-address {email}")
     return "Example:\n  " + " ".join(parts)
 
 
@@ -276,11 +279,17 @@ def main() -> int:
         metavar="DOMAIN",
         help="Public domain for the panel and Minecraft (required with --pterodactyl)",
     )
+    parser.add_argument(
+        "--email-address",
+        metavar="EMAIL",
+        help="ACME contact email. Required when the panel client is not already defined",
+    )
     args = parser.parse_args()
     save_settings({
         "target_server": args.target_server,
         "pterodactyl": bool(args.pterodactyl),
         "pterodactyl_domain": args.pterodactyl_domain or "",
+        "email_address": args.email_address or "",
     })
 
     if args.pterodactyl and not args.pterodactyl_domain:
@@ -306,6 +315,16 @@ def main() -> int:
             f"→ home port {nomcproxy.PTERODACTYL_PRIVATE_PORT}"
         )
         print("The home IP and dynamic hostname stay hidden.")
+        panel_client = nomcproxy.acme_client_name(panel_host)
+        generated = Path("/etc/angie/http.d") / nomcproxy.PANEL_CONF_NAME
+        if not nomcproxy.acme_client_defined(panel_client, exclude=generated):
+            if not args.email_address or "@" not in args.email_address:
+                echo0(
+                    f"Error: acme_client {panel_client} is not defined in a file "
+                    "nomcproxy does not generate."
+                )
+                echo0("Pass --email-address you@domain so it can be defined.")
+                return 1
 
     if OLD_CRON_PATH.is_file():
         OLD_CRON_PATH.unlink()
@@ -313,7 +332,9 @@ def main() -> int:
 
     try:
         panel = names[2] if names else None
-        service = nomcproxy.apply_target_server(args.target_server, panel_domain=panel)
+        service = nomcproxy.apply_target_server(
+            args.target_server, panel_domain=panel, email=args.email_address or ""
+        )
         print(f"Configuration applied for {args.target_server}")
         if service == "angie" and nomcproxy.ssl_already_on_443(service):
             print()
