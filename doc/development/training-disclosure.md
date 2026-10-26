@@ -833,3 +833,24 @@ On proxy I get Error: name 'SFTP_CONF_NAME' is not defined
 
 On the home server, ./install-pterodactyl-instead.py (with necessary args) causes:
 - paste `NameError: name 'docker_present' is not defined` ... etc
+
+- 2026-10-25
+
+Create server (using LAN IP for allocation) says "Could not establish a connection to the machine running this server. Please try again."
+
+How can we manually run the cert sync to make sure it is installed before trying again?
+- paste wings service status
+
+So far I did the usermod command on the target, then on the proxy I have:
+- paste output, looks sortof ok
+Target says:
+- wings running but has TLS error
+
+On target:
+- paste output of cert checking commands
+On proxy:
+- paste output of cert checking commands
+
+- paste output of appending issuer to pem
+
+I got ok! Also, Create Server worked. Now, automate the fix. If necessary, make a script in the target only folder (generate it somewhere else at worst case) that the sync process on the proxy can run remotely via ssh.

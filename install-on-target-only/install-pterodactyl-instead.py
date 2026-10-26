@@ -1224,8 +1224,9 @@ def prepare_certsync_user() -> int:
     try:
         pwd.getpwnam("certsync")
         print("User certsync already exists")
+        run(["usermod", "--shell", "/bin/sh", "certsync"])
     except KeyError:
-        rc = run(["useradd", "--system", "--create-home", "--shell", "/usr/sbin/nologin", "certsync"])
+        rc = run(["useradd", "--system", "--create-home", "--shell", "/bin/sh", "certsync"])
         if rc != 0:
             return rc
     ssl_dir = Path("/etc/pterodactyl/ssl")
@@ -1243,10 +1244,19 @@ def prepare_certsync_user() -> int:
     subprocess.run(["chown", "certsync:certsync", str(auth)], check=True)
     sudoers = Path("/etc/sudoers.d/certsync-wings")
     sudoers.write_text(
-        "certsync ALL=(root) NOPASSWD: /bin/systemctl reload wings, "
+        "certsync ALL=(root) NOPASSWD: "
+        "/usr/local/sbin/nomcproxy-build-wings-chain, "
         "/bin/systemctl restart wings\n"
     )
     sudoers.chmod(0o440)
+    chain_src = Path(__file__).resolve().parent / "build-wings-chain.sh"
+    chain_dst = Path("/usr/local/sbin/nomcproxy-build-wings-chain")
+    if chain_src.is_file():
+        chain_dst.write_text(chain_src.read_text())
+        chain_dst.chmod(0o755)
+        print(f"Installed {chain_dst}")
+    else:
+        echo0(f"Warning: missing {chain_src}; chain build will fail until it is installed")
     print("certsync user ready. Add the proxy's public key to")
     print(f"  {auth}")
     print("Wings cert paths: /etc/pterodactyl/ssl/fullchain.pem and privkey.pem")

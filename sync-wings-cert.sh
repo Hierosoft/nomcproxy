@@ -37,27 +37,22 @@ fi
 stage=$(mktemp -d)
 trap 'rm -rf "$stage"' EXIT
 
-if [ -f "${SRC}/chain.pem" ]; then
-    cat "$cert" "${SRC}/chain.pem" > "${stage}/fullchain.pem"
-else
-    openssl x509 -in "$cert" -out "${stage}/fullchain.pem"
-fi
-openssl pkey -in "$priv" -out "${stage}/privkey.pem"
+# Push the leaf. The home server builds leaf + YE1 + Root YE.
+cp -L "$cert" "${stage}/leaf.pem"
+cp -L "$priv" "${stage}/privkey.pem"
 chmod 600 "${stage}/privkey.pem"
 
 changed=$(rsync -ac --itemize-changes --chmod=Fu=rw,go= \
     -e "ssh -i ${NOMC_CERTSYNC_KEY} -o StrictHostKeyChecking=accept-new" \
-    "${stage}/fullchain.pem" "${stage}/privkey.pem" \
+    "${stage}/leaf.pem" "${stage}/privkey.pem" \
     "${NOMC_CERTSYNC_USER}@${NOMC_CERTSYNC_HOST}:${NOMC_CERTSYNC_DIR}/")
 
-if [ -z "$changed" ]; then
-    echo "certsync: unchanged, not reloading wings"
-    exit 0
+echo "certsync: synced leaf from ${SRC}"
+if [ -n "$changed" ]; then
+    echo "$changed"
 fi
 
-echo "certsync: updated from ${SRC}"
-echo "$changed"
 ssh -i "$NOMC_CERTSYNC_KEY" -o StrictHostKeyChecking=accept-new \
     "${NOMC_CERTSYNC_USER}@${NOMC_CERTSYNC_HOST}" \
-    "sudo systemctl reload wings || sudo systemctl restart wings"
-echo "certsync: wings reloaded"
+    "sudo /usr/local/sbin/nomcproxy-build-wings-chain ${NOMC_CERTSYNC_DIR} && sudo systemctl restart wings"
+echo "certsync: chain built, wings restarted"
