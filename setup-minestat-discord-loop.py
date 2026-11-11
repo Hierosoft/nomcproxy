@@ -131,11 +131,44 @@ def venv_python() -> Path:
     return nomcproxy.VENV_PATH / "bin" / "python"
 
 
+def ensure_venv_package() -> None:
+    """Install the matching python3.X-venv package if venv creation needs it.
+
+    Debian/Ubuntu split ensurepip into a separate package. A failed
+    `python3 -m venv` that mentions ensurepip means we must install it.
+    """
+    major, minor = sys.version_info[:2]
+    pkg = f"python{major}.{minor}-venv"
+    echo0(f"Installing {pkg} (required for venv / ensurepip)...")
+    # Prefer the versioned package; fall back to the generic one.
+    r = subprocess.run(
+        ["apt-get", "install", "-y", pkg],
+        capture_output=True,
+        text=True,
+    )
+    if r.returncode != 0:
+        echo0(f"apt-get install {pkg} failed; trying python3-venv...")
+        r2 = subprocess.run(
+            ["apt-get", "install", "-y", "python3-venv"],
+            capture_output=True,
+            text=True,
+        )
+        if r2.returncode != 0:
+            echo0("Error: could not install a python venv package.")
+            echo0(r.stderr[-500:] if r.stderr else "")
+            echo0(r2.stderr[-500:] if r2.stderr else "")
+            echo0(f"Install it manually, then re-run:")
+            echo0(f"  apt install {pkg}")
+            sys.exit(1)
+    print(f"Installed venv support.")
+
+
 def ensure_venv() -> Path:
     """Create or repair the venv, then ensure minestat is importable in it.
 
     A system Python upgrade can leave a venv with a broken interpreter.
     If the venv's python cannot even start, delete the venv and recreate it.
+    On Debian/Ubuntu, also install python3.X-venv if ensurepip is missing.
     """
     py = venv_python()
 
@@ -160,10 +193,26 @@ def ensure_venv() -> Path:
     if not py.is_file() or not python_runs(py):
         print(f"Creating venv: {nomcproxy.VENV_PATH}")
         nomcproxy.VENV_PATH.parent.mkdir(parents=True, exist_ok=True)
-        subprocess.run(
+        r = subprocess.run(
             [sys.executable, "-m", "venv", str(nomcproxy.VENV_PATH)],
-            check=True,
+            capture_output=True,
+            text=True,
         )
+        if r.returncode != 0:
+            combined = (r.stdout or "") + (r.stderr or "")
+            # Partial directory is left behind on failure; remove it.
+            shutil.rmtree(nomcproxy.VENV_PATH, ignore_errors=True)
+            if "ensurepip" in combined or "python3-venv" in combined or "python3." in combined:
+                ensure_venv_package()
+                print(f"Retrying venv creation: {nomcproxy.VENV_PATH}")
+                subprocess.run(
+                    [sys.executable, "-m", "venv", str(nomcproxy.VENV_PATH)],
+                    check=True,
+                )
+            else:
+                echo0("Error: venv creation failed:")
+                echo0(combined[-1000:])
+                sys.exit(1)
         if not python_runs(py):
             echo0(f"Error: venv python still cannot run after creation: {py}")
             sys.exit(1)
