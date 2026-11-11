@@ -7,7 +7,7 @@ the appropriate service.
 
 from __future__ import annotations
 
-import argparse
+import json
 import logging
 import os
 import re
@@ -15,6 +15,7 @@ import socket
 import subprocess
 import sys
 import urllib.request
+from collections import OrderedDict
 from pathlib import Path
 
 CONF_NAME = "nomcproxy-minecraft.conf"
@@ -30,6 +31,19 @@ WINGS_PORT = 8080
 SFTP_PORT = 2022
 RESOLVERS = "1.1.1.1 8.8.8.8"
 LOG_FILE_PATH = Path("/var/log/nomcproxy.log")
+
+# Shared paths used by installers and the Discord status loop.
+PRIVATE_SERVER_MD_PATH = Path("/opt/minecraft/server.md")
+SETTINGS_PATH = Path("/etc/nomcproxy/settings.json")
+OLD_CRON_PATH = Path("/etc/cron.d/nomcproxy")
+LOOP_PATH = Path("/usr/local/sbin/nomcproxy-minestat-discord-loop")
+ENV_PATH = Path("/etc/nomcproxy/minestat-discord.env")
+UNIT_PATH = Path("/etc/systemd/system/nomcproxy-minestat-discord.service")
+UNIT_NAME = "nomcproxy-minestat-discord.service"
+CERTSYNC_SCRIPT_PATH = Path("/usr/local/sbin/nomcproxy-certsync")
+CERTSYNC_ENV_PATH = Path("/etc/nomcproxy/certsync.env")
+CERTSYNC_KEY_PATH = Path("/root/.ssh/nomcproxy-certsync")
+SYSTEMD_UNIT_DIR = Path("/etc/systemd/system")
 
 # Pterodactyl panel: home listens on an atypical port. The public proxy
 # exposes it as an HTTP virtual host on 443 for a specific domain, so it
@@ -73,6 +87,37 @@ DYNAMIC_DNS_HOSTS = frozenset({
     "selfip.net",
     "selfip.org",
 })
+
+
+def load_settings() -> OrderedDict:
+    """Load /etc/nomcproxy/settings.json as an OrderedDict. Empty if missing or invalid."""
+    if not SETTINGS_PATH.is_file():
+        return OrderedDict()
+    try:
+        return json.loads(SETTINGS_PATH.read_text(), object_pairs_hook=OrderedDict)
+    except (OSError, json.JSONDecodeError):
+        return OrderedDict()
+
+
+def save_settings(data: dict) -> None:
+    """Write settings.json (0600). Creates the directory if needed."""
+    ordered = OrderedDict(data)
+    SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    SETTINGS_PATH.write_text(json.dumps(ordered, indent=2) + "\n")
+    os.chmod(SETTINGS_PATH, 0o600)
+
+
+def derive_mc_host(settings: dict | None = None) -> str:
+    """Return the public mc. address from first-time proxy setup, or empty string."""
+    if settings is None:
+        settings = load_settings()
+    domain = (settings.get("pterodactyl_domain") or "").strip().rstrip(".").lower()
+    if not domain or "." not in domain:
+        return ""
+    for prefix in ("panel.", "mc."):
+        if domain.startswith(prefix) and "." in domain[len(prefix):]:
+            return ""
+    return "mc." + domain
 
 
 def is_dynamic_address(addr: str) -> bool:

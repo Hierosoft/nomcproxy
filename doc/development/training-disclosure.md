@@ -854,3 +854,43 @@ On proxy:
 - paste output of appending issuer to pem
 
 I got ok! Also, Create Server worked. Now, automate the fix. If necessary, make a script in the target only folder (generate it somewhere else at worst case) that the sync process on the proxy can run remotely via ssh.
+
+- 2026-10-25
+
+How do we know that a panel user invite e-mail got sent? I don't even know if I fully setup e-mail on my home server.
+
+The settings are blank. Is there any way to get the invite link now, or resend after I fix the settings?
+```
+ root@birdo:/opt/git/nomcproxy# grep ^MAIL_ /var/www/pterodactyl/.env
+MAIL_MAILER=smtp
+MAIL_HOST=smtp.example.com
+MAIL_PORT=25
+MAIL_USERNAME=
+MAIL_PASSWORD=
+MAIL_ENCRYPTION=tls
+MAIL_FROM_ADDRESS=no-reply@example.com
+MAIL_FROM_NAME="Pterodactyl Panel"
+```
+
+- 2026-11-10 https://grok.com/project/b8272a8f-a09e-43d8-ad63-47993cc1b213?chat=332b1ff9-8d51-490d-99b8-72cc1bb051c8
+
+Is there a good Discord server status plugin for Hexxit (MC 1.5.2), or might we be able to find or make some kind of service on the same server that can notify a bot on status change (reading MC server status directly, then reporting to discord) or something?
+
+What if the machine running it is on a home IP address I don't want to give out, can I use the minestat loop program on a VPS (and to hide the home IP address, do I have to do that rather than put it on the home server)? The VPS has streaming proxy setup in NGINX for 25565 and 25566 (There are two instances on the same target server, which uses the same ports as the proxy).
+
+25565 Blightfall, 25566 Hexxit. Add a separate setup-minestat-discord-loop.py that installs the script and the systemd unit. Reuse our existing json from the initial proxy installer. If the json is missing or doesn't have enough information to do what we need to do, show an error saying to run proxy setup first. If there is target metadata on the machine, show an error saying that the discord loop must run on the proxy and that this machine seems to be the target. Make this new secondary setup script require a "--ports" option with one or more ports, comma separated as the value. If there is further information we need that our initial setup doesn't write (including the Discord webhook url), instead of messing with initial setup, require it here. In any case, as long as we have enough information, load the setup json, write the ports (and any other info that is helpful, such as a list of files installed including the full path to the loop file and wherever we copied/generated the systemd unit file). Make sure we actually start the systemd service with enable --now, or if it existed before, daemon-reload then restart the service. After setup is complete, on fail, success (including any skips of stuff already done and matching the specified configuration options), show the instructions to setup the correct bot and acquire the webhook url (If webhook URL was specified, mark that as complete in the terminal end of run summary)
+
+Make a discord.md with exact instructions for the Discord server owner.
+
+The status messages actually appearing on discord should distinguish the servers as follows: the proxy address from first-time setup (starting with "mc."), colon, then port number, space, then given name. If the syntax of the secondary setup is incorrect or has missing argument(s), but the json has correct arguments from a previous run, after showing the arguments syntax, in the example show the actual values instead of dummy values.
+
+Move stuff like:
+```
+PRIVATE_SERVER_MD_PATH = Path("/opt/minecraft/server.md")
+SETTINGS_PATH = Path("/etc/nomcproxy/settings.json")
+LOOP_PATH = Path("/usr/local/sbin/nomcproxy-minestat-discord-loop")
+ENV_PATH = Path("/etc/nomcproxy/minestat-discord.env")
+UNIT_PATH = Path("/etc/systemd/system/nomcproxy-minestat-discord.service")
+UNIT_NAME = "nomcproxy-minestat-discord.service"
+```
+To the init of the module (also move stuff out of install.py to there nonredundantly). Instead of emitting LOOP_SCRIPT and rewriting placeholders to make it work, make it its own py file and make the py file load relevant variables from settings.json and/or other places.

@@ -13,6 +13,9 @@ by Angie/nginx (resolver + variable). No cron job.
 nomcproxy/
   nomcproxy.py              # reusable module
   install.py                # installer (--target-server)
+  setup-minestat-discord-loop.py  # optional Discord status loop on the proxy
+  minestat-discord-loop.py  # the loop itself (copied to /usr/local/sbin/)
+  discord.md                # instructions for the Discord server owner
   README.md
   AGENTS.md
   install-on-target-only/   # Python scripts for the home Minecraft server only
@@ -70,7 +73,23 @@ nomcproxy.apply_target_server("myhost.example.net")
 nomcproxy.apply_target_server("203.0.113.42", panel_domain="play.example.com")
 ```
 
-## Checking logs
+## Discord status loop (optional)
+
+After the proxy is installed, you can run a MineStat-based Discord notifier
+on the **proxy** (never on the home server):
+
+```bash
+sudo python3 setup-minestat-discord-loop.py \
+  --ports 25565,25566 \
+  --names Blightfall,Hexxit \
+  --webhook-url 'https://discord.com/api/webhooks/...'
+```
+
+- Requires `/etc/nomcproxy/settings.json` from a previous `install.py` run.
+- Refuses to run if `/opt/minecraft/server.md` exists (target marker).
+- Installs `/usr/local/sbin/nomcproxy-minestat-discord-loop`, an env file, and a systemd unit.
+- The loop polls `127.0.0.1` on the listed ports (the stream proxy) and posts to the webhook on status or player-count changes.
+- Webhook URL is stored only in the 0600 env file, not in settings.json.
 
 ```bash
 tail -f /var/log/nomcproxy.log

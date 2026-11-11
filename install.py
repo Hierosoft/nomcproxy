@@ -26,9 +26,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import nomcproxy
 
-PRIVATE_SERVER_MD_PATH = Path("/opt/minecraft/server.md")
-OLD_CRON_PATH = Path("/etc/cron.d/nomcproxy")
-SETTINGS_PATH = Path("/etc/nomcproxy/settings.json")
+# Paths and settings helpers live in the module.
 
 
 def explain_and_refuse(reason: str) -> int:
@@ -46,9 +44,9 @@ def explain_and_refuse(reason: str) -> int:
 
 def check_opposing_markers() -> int | None:
     """Refuse if private-server markers are present. Proxy confs are allowed."""
-    if PRIVATE_SERVER_MD_PATH.is_file():
+    if nomcproxy.PRIVATE_SERVER_MD_PATH.is_file():
         return explain_and_refuse(
-            f"{PRIVATE_SERVER_MD_PATH} exists — this is the private server"
+            f"{nomcproxy.PRIVATE_SERVER_MD_PATH} exists — this is the private server"
         )
     return None
 
@@ -59,19 +57,11 @@ def echo0(*args, **kwargs) -> None:
 
 
 def load_settings() -> OrderedDict:
-    if not SETTINGS_PATH.is_file():
-        return OrderedDict()
-    try:
-        return json.loads(SETTINGS_PATH.read_text(), object_pairs_hook=OrderedDict)
-    except (OSError, json.JSONDecodeError):
-        return OrderedDict()
+    return nomcproxy.load_settings()
 
 
 def save_settings(data: dict) -> None:
-    ordered = OrderedDict(data)
-    SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    SETTINGS_PATH.write_text(json.dumps(ordered, indent=2) + "\n")
-    os.chmod(SETTINGS_PATH, 0o600)
+    nomcproxy.save_settings(data)
 
 
 def print_completion_guide(apex: str, target_server: str) -> None:
@@ -193,9 +183,9 @@ def setup_certsync(apex: str, target_server: str) -> None:
     node_host = "node." + apex
     client = nomcproxy.acme_client_name(node_host)
     script_src = Path(__file__).resolve().parent / "sync-wings-cert.sh"
-    script_dst = Path("/usr/local/sbin/nomcproxy-certsync")
-    key_path = Path("/root/.ssh/nomcproxy-certsync")
-    unit_dir = Path("/etc/systemd/system")
+    script_dst = nomcproxy.CERTSYNC_SCRIPT_PATH
+    key_path = nomcproxy.CERTSYNC_KEY_PATH
+    unit_dir = nomcproxy.SYSTEMD_UNIT_DIR
 
     if not script_src.is_file():
         echo0(f"Error: missing {script_src}")
@@ -220,7 +210,7 @@ def setup_certsync(apex: str, target_server: str) -> None:
     settings["certsync_key"] = str(key_path)
     save_settings(settings)
 
-    env_path = Path("/etc/nomcproxy/certsync.env")
+    env_path = nomcproxy.CERTSYNC_ENV_PATH
     env_path.write_text(
         f"NOMC_ACME_CLIENT={client}\n"
         f"NOMC_CERTSYNC_HOST={target_server}\n"
@@ -433,9 +423,9 @@ def main() -> int:
                 echo0("Pass --email-address you@domain so it can be defined.")
                 return 1
 
-    if OLD_CRON_PATH.is_file():
-        OLD_CRON_PATH.unlink()
-        print(f"Removed obsolete cron job: {OLD_CRON_PATH}")
+    if nomcproxy.OLD_CRON_PATH.is_file():
+        nomcproxy.OLD_CRON_PATH.unlink()
+        print(f"Removed obsolete cron job: {nomcproxy.OLD_CRON_PATH}")
 
     try:
         panel = names[2] if names else None
