@@ -896,3 +896,66 @@ UNIT_NAME = "nomcproxy-minestat-discord.service"
 To the init of the module (also move stuff out of install.py to there nonredundantly). Instead of emitting LOOP_SCRIPT and rewriting placeholders to make it work, make it its own py file and make the py file load relevant variables from settings.json and/or other places.
 
 Improve the loop setup so it creates a venv, tests the venv is ok (the python there is able to run at all; otherwise a system upgrade may have messed it up and the venv needs to be deleted and redone; and if can run, check if it can import minestat, and if not, use the venv's python with -m pip install minestat), and makes the service use that venv's python to run the loop script.
+
+```
+root@racknerd-redacted:/opt/git/nomcproxy# python3 setup-minestat-discord-loop.py --ports 25565,25566 --names Blightfall,Hexxit --webhook-url 'https://discord.com/api/webhooks/redacted1/redacted2-redacted3-redacted4'
+Creating venv: /opt/nomcproxy/minestat-discord-venv
+The virtual environment was not created successfully because ensurepip is not
+available.  On Debian/Ubuntu systems, you need to install the python3-venv
+package using the following command.
+
+    apt install python3.13-venv
+
+You may need to use sudo with that command.  After installing the python3-venv
+package, recreate your virtual environment.
+
+Failing command: /opt/nomcproxy/minestat-discord-venv/bin/python3
+
+Traceback (most recent call last):
+  File "/opt/git/nomcproxy/setup-minestat-discord-loop.py", line 442, in <module>
+    sys.exit(main())
+             ~~~~^^
+  File "/opt/git/nomcproxy/setup-minestat-discord-loop.py", line 417, in main
+    venv_py = ensure_venv()
+  File "/opt/git/nomcproxy/setup-minestat-discord-loop.py", line 163, in ensure_venv
+    subprocess.run(
+    ~~~~~~~~~~~~~~^
+        [sys.executable, "-m", "venv", str(nomcproxy.VENV_PATH)],
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        check=True,
+        ^^^^^^^^^^^
+    )
+    ^
+  File "/usr/lib/python3.13/subprocess.py", line 577, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['/usr/bin/python3', '-m', 'venv', '/opt/nomcproxy/minestat-discord-venv']' returned non-zero exit status 1.
+root@racknerd-redacted:/opt/git/nomcproxy# python3 --version
+Python 3.13.5
+```
+
+If the venv itself can't run pip, it may need to be recreated. See what we can do to heal this regardless:
+```
+root@racknerd-0b1b84:/opt/git/nomcproxy# python3 setup-minestat-discord-loop.py --ports 25565,25566 --names Blightfall,Hexxit --webhook-url 'https://discord.com/api/webhooks/redacted1/redacted2-redacted3-redacted4'
+minestat not importable in venv; installing...
+/opt/nomcproxy/minestat-discord-venv/bin/python: No module named pip
+Traceback (most recent call last):
+  File "/opt/git/nomcproxy/setup-minestat-discord-loop.py", line 491, in <module>
+    sys.exit(main())
+             ~~~~^^
+  File "/opt/git/nomcproxy/setup-minestat-discord-loop.py", line 466, in main
+    venv_py = ensure_venv()
+  File "/opt/git/nomcproxy/setup-minestat-discord-loop.py", line 228, in ensure_venv
+    subprocess.run(
+    ~~~~~~~~~~~~~~^
+        [str(py), "-m", "pip", "install", "--upgrade", "minestat", "requests"],
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        check=True,
+        ^^^^^^^^^^^
+    )
+    ^
+  File "/usr/lib/python3.13/subprocess.py", line 577, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['/opt/nomcproxy/minestat-discord-venv/bin/python', '-m', 'pip', 'install', '--upgrade', 'minestat', 'requests']' returned non-zero exit status 1.
+```

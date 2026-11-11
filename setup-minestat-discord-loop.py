@@ -168,7 +168,8 @@ def ensure_venv() -> Path:
 
     A system Python upgrade can leave a venv with a broken interpreter.
     If the venv's python cannot even start, delete the venv and recreate it.
-    On Debian/Ubuntu, also install python3.X-venv if ensurepip is missing.
+    If the interpreter runs but pip is missing, also recreate (ensurepip
+    sometimes fails silently on Debian when the venv package was missing).
     """
     py = venv_python()
 
@@ -185,12 +186,23 @@ def ensure_venv() -> Path:
         except (OSError, subprocess.TimeoutExpired):
             return False
 
-    if nomcproxy.VENV_PATH.exists() and not python_runs(py):
-        echo0(f"Venv python at {py} cannot run (likely a system upgrade).")
-        echo0(f"Removing and recreating {nomcproxy.VENV_PATH}")
-        shutil.rmtree(nomcproxy.VENV_PATH, ignore_errors=True)
+    def pip_runs(p: Path) -> bool:
+        if not p.is_file():
+            return False
+        try:
+            r = subprocess.run(
+                [str(p), "-m", "pip", "--version"],
+                capture_output=True,
+                timeout=20,
+            )
+            return r.returncode == 0
+        except (OSError, subprocess.TimeoutExpired):
+            return False
 
-    if not py.is_file() or not python_runs(py):
+    def recreate() -> None:
+        """Delete and create a fresh venv, installing the venv package if needed."""
+        if nomcproxy.VENV_PATH.exists():
+            shutil.rmtree(nomcproxy.VENV_PATH, ignore_errors=True)
         print(f"Creating venv: {nomcproxy.VENV_PATH}")
         nomcproxy.VENV_PATH.parent.mkdir(parents=True, exist_ok=True)
         r = subprocess.run(
@@ -200,7 +212,6 @@ def ensure_venv() -> Path:
         )
         if r.returncode != 0:
             combined = (r.stdout or "") + (r.stderr or "")
-            # Partial directory is left behind on failure; remove it.
             shutil.rmtree(nomcproxy.VENV_PATH, ignore_errors=True)
             if "ensurepip" in combined or "python3-venv" in combined or "python3." in combined:
                 ensure_venv_package()
@@ -215,6 +226,33 @@ def ensure_venv() -> Path:
                 sys.exit(1)
         if not python_runs(py):
             echo0(f"Error: venv python still cannot run after creation: {py}")
+            sys.exit(1)
+
+    # Heal a broken or incomplete venv.
+    needs_recreate = False
+    if nomcproxy.VENV_PATH.exists():
+        if not python_runs(py):
+            echo0(f"Venv python at {py} cannot run (likely a system upgrade).")
+            needs_recreate = True
+        elif not pip_runs(py):
+            echo0(f"Venv at {nomcproxy.VENV_PATH} has no working pip.")
+            needs_recreate = True
+    else:
+        needs_recreate = True
+
+    if needs_recreate:
+        if nomcproxy.VENV_PATH.exists():
+            echo0(f"Removing and recreating {nomcproxy.VENV_PATH}")
+        recreate()
+
+    # Final check: pip must work. If it still doesn't, one more recreate
+    # after forcing the venv package install.
+    if not pip_runs(py):
+        echo0("pip still missing after venv creation; installing venv package and retrying.")
+        ensure_venv_package()
+        recreate()
+        if not pip_runs(py):
+            echo0(f"Error: venv python at {py} still has no pip after recreate.")
             sys.exit(1)
 
     # Check whether minestat is importable; install if not.
@@ -240,7 +278,7 @@ def ensure_venv() -> Path:
             sys.exit(1)
         print("Installed minestat and requests into the venv.")
     else:
-        print("Venv python runs and can import minestat.")
+        print("Venv python runs, has pip, and can import minestat.")
 
     return py
 
