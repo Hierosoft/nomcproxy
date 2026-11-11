@@ -894,3 +894,5 @@ UNIT_PATH = Path("/etc/systemd/system/nomcproxy-minestat-discord.service")
 UNIT_NAME = "nomcproxy-minestat-discord.service"
 ```
 To the init of the module (also move stuff out of install.py to there nonredundantly). Instead of emitting LOOP_SCRIPT and rewriting placeholders to make it work, make it its own py file and make the py file load relevant variables from settings.json and/or other places.
+
+Improve the loop setup so it creates a venv, tests the venv is ok (the python there is able to run at all; otherwise a system upgrade may have messed it up and the venv needs to be deleted and redone; and if can run, check if it can import minestat, and if not, use the venv's python with -m pip install minestat), and makes the service use that venv's python to run the loop script.

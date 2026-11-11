@@ -38,6 +38,7 @@ SETTINGS_PATH = Path("/etc/nomcproxy/settings.json")
 OLD_CRON_PATH = Path("/etc/cron.d/nomcproxy")
 LOOP_PATH = Path("/usr/local/sbin/nomcproxy-minestat-discord-loop")
 ENV_PATH = Path("/etc/nomcproxy/minestat-discord.env")
+VENV_PATH = Path("/opt/nomcproxy/minestat-discord-venv")
 UNIT_PATH = Path("/etc/systemd/system/nomcproxy-minestat-discord.service")
 UNIT_NAME = "nomcproxy-minestat-discord.service"
 CERTSYNC_SCRIPT_PATH = Path("/usr/local/sbin/nomcproxy-certsync")

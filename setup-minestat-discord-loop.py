@@ -127,19 +127,73 @@ def print_usage_and_example(parser: argparse.ArgumentParser, settings: dict, rea
     echo0()
 
 
-def ensure_deps() -> None:
-    """Best-effort install of minestat and requests if missing."""
-    try:
-        import minestat  # noqa: F401
-        import requests  # noqa: F401
-        return
-    except ImportError:
-        pass
-    echo0("Installing minestat and requests...")
-    subprocess.run(
-        [sys.executable, "-m", "pip", "install", "--upgrade", "minestat", "requests"],
-        check=False,
+def venv_python() -> Path:
+    return nomcproxy.VENV_PATH / "bin" / "python"
+
+
+def ensure_venv() -> Path:
+    """Create or repair the venv, then ensure minestat is importable in it.
+
+    A system Python upgrade can leave a venv with a broken interpreter.
+    If the venv's python cannot even start, delete the venv and recreate it.
+    """
+    py = venv_python()
+
+    def python_runs(p: Path) -> bool:
+        if not p.is_file():
+            return False
+        try:
+            r = subprocess.run(
+                [str(p), "-c", "import sys; sys.exit(0)"],
+                capture_output=True,
+                timeout=15,
+            )
+            return r.returncode == 0
+        except (OSError, subprocess.TimeoutExpired):
+            return False
+
+    if nomcproxy.VENV_PATH.exists() and not python_runs(py):
+        echo0(f"Venv python at {py} cannot run (likely a system upgrade).")
+        echo0(f"Removing and recreating {nomcproxy.VENV_PATH}")
+        shutil.rmtree(nomcproxy.VENV_PATH, ignore_errors=True)
+
+    if not py.is_file() or not python_runs(py):
+        print(f"Creating venv: {nomcproxy.VENV_PATH}")
+        nomcproxy.VENV_PATH.parent.mkdir(parents=True, exist_ok=True)
+        subprocess.run(
+            [sys.executable, "-m", "venv", str(nomcproxy.VENV_PATH)],
+            check=True,
+        )
+        if not python_runs(py):
+            echo0(f"Error: venv python still cannot run after creation: {py}")
+            sys.exit(1)
+
+    # Check whether minestat is importable; install if not.
+    r = subprocess.run(
+        [str(py), "-c", "import minestat"],
+        capture_output=True,
+        timeout=30,
     )
+    if r.returncode != 0:
+        print("minestat not importable in venv; installing...")
+        subprocess.run(
+            [str(py), "-m", "pip", "install", "--upgrade", "minestat", "requests"],
+            check=True,
+        )
+        r = subprocess.run(
+            [str(py), "-c", "import minestat, requests"],
+            capture_output=True,
+            timeout=30,
+        )
+        if r.returncode != 0:
+            echo0("Error: minestat still not importable after install.")
+            echo0(r.stderr.decode(errors="replace"))
+            sys.exit(1)
+        print("Installed minestat and requests into the venv.")
+    else:
+        print("Venv python runs and can import minestat.")
+
+    return py
 
 
 def write_loop() -> None:
@@ -169,7 +223,7 @@ def write_env(webhook: str, ports: list[int], names: list[str], interval: int, m
     print(f"Wrote environment: {nomcproxy.ENV_PATH}")
 
 
-def write_unit() -> None:
+def write_unit(venv_py: Path) -> None:
     unit = f"""[Unit]
 Description=nomcproxy MineStat Discord status loop
 After=network-online.target
@@ -178,7 +232,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 EnvironmentFile={nomcproxy.ENV_PATH}
-ExecStart={nomcproxy.LOOP_PATH}
+ExecStart={venv_py} {nomcproxy.LOOP_PATH}
 Restart=on-failure
 RestartSec=10
 
@@ -221,6 +275,7 @@ def print_summary(
     print("Installed / configured files:")
     print(f"  Loop script:  {nomcproxy.LOOP_PATH}")
     print(f"  Environment:  {nomcproxy.ENV_PATH}")
+    print(f"  Venv:         {nomcproxy.VENV_PATH}")
     print(f"  Systemd unit: {nomcproxy.UNIT_PATH}")
     print(f"  Settings:     {nomcproxy.SETTINGS_PATH}")
     print()
@@ -354,14 +409,15 @@ def main() -> int:
         str(nomcproxy.LOOP_PATH),
         str(nomcproxy.ENV_PATH),
         str(nomcproxy.UNIT_PATH),
+        str(nomcproxy.VENV_PATH),
     ]
 
     skipped: list[str] = []
 
-    ensure_deps()
+    venv_py = ensure_venv()
     write_loop()
     write_env(webhook, ports, names, args.interval, mc_host)
-    write_unit()
+    write_unit(venv_py)
 
     settings["discord_loop_ports"] = ports
     settings["discord_loop_names"] = names
