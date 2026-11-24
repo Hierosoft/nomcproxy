@@ -1132,3 +1132,40 @@ For crafting recipes, use 3x3 markdown tables. Show a few often-used recipes for
 Use emojis as much as possible for ingredients in grids.
 
 Re-read all player help files where you've described how to craft anything, and use grids instead (emoji where possible).
+
+- 2026-11-23 https://grok.com/project/b8272a8f-a09e-43d8-ad63-47993cc1b213?chat=aa560979-4c33-4c09-a3d4-33c9505e0c1e
+
+I tried the first permission command in plugins.md in the server console of the Tekkit Classic (Minecraft 1.2.5) server in pterodactyl but get:
+```
+>mangaddp Default essentials.home
+22:24:19 [WARNING] Unexpected exception while parsing console command
+org.bukkit.command.CommandException: Unhandled exception executing command 'mangaddp' in plugin GroupManager vPre2.14.1.3 FINAL (Phoenix)
+        at org.bukkit.command.PluginCommand.execute(PluginCommand.java:42)
+        at org.bukkit.command.SimpleCommandMap.dispatch(SimpleCommandMap.java:166)
+        at forge.bukkit.ForgeCommandMap.dispatch(ForgeCommandMap.java:55)
+        at org.bukkit.craftbukkit.CraftServer.dispatchCommand(CraftServer.java:497)
+        at org.bukkit.craftbukkit.CraftServer.dispatchServerCommand(CraftServer.java:493)
+        at net.minecraft.server.MinecraftServer.b(MinecraftServer.java:625)
+        at net.minecraft.server.MinecraftServer.w(MinecraftServer.java:593)
+        at net.minecraft.server.MinecraftServer.run(MinecraftServer.java:467)
+        at net.minecraft.server.ThreadServerApplication.run(SourceFile:492)
+Caused by: java.lang.NullPointerException
+        at org.anjocaido.groupmanager.GroupManager.onCommand(GroupManager.java:400)
+        at org.bukkit.command.PluginCommand.execute(PluginCommand.java:40)
+        ... 8 more
+```
+Do we need an older version? Where do we get 2.9.2?
+
+That group manager version that crashed is the one you recommended before, and recommended again now. Are you sure we can't find 2.9.2 and may need that, to match our essentials version?
+
+Make a permissionsex.md in the target server only folder with all of the steps necessary to get the correct version and set it up. Refer to https://forums.technicpack.net/topic/45481-permissionsex-with-tekkit-classic/ and outlinks discussed there.
+
+Adapt the bed setup instructions in the preexisting md to use permissionsex commands.
+
+Add brief instructions for LIFT to player instructions: Place an iron block. Stand on it. Place a button on a block directly in front of you. Place a blank sign above that. Optionally, place a sign below the button with the floor name. Repeat directly above for higher floors except with glass block instead of iron. Don't place any blocks between the blocks where you stand. Right-click each sign to update. Add a script to the install on target folder which can be used to check the version of a plugin jar file (shows error if not a Minecraft plugin).
+
+Restore the Group Manager instructions as a separate section in plugins and commands md (don't include in player commands md), and in the heading also say " (optional)" and under the heading put "(This plugin is no longer distributed but can be compiled. PermissionsEx is recommended)".
+
+It doesn't seem like we really need a separate level 2 heading in plugins.md and commands.md. All you did was change the title in some cases. In all cases where group permissions are discussed, make PermissionsEx is the main heading and that the instructions are compatible with it. Then Add a level 3 heading below it explaining that Group Manager is an alternative, and list the differences from the given instructions, or say that it operates the same way if so (but put the right folder name considering where configs reside if applicable).
+
+When you say no longer distributed, clarify by instead saying "2.9.2 is no longer distributed"

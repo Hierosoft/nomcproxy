@@ -5,7 +5,7 @@ These do not require operator status. Some need specific permissions that are gr
 Placeholders use `<angle brackets>`.
 
 Admin / OP commands are documented separately in [commands.md](https://github.com/Hierosoft/nomcproxy/blob/main/commands.md). <br>
-Plugin settings and GroupManager notes are in [install-on-target-only/plugins.md](https://github.com/Hierosoft/nomcproxy/blob/main/install-on-target-only/plugins.md).
+Plugin settings are in [install-on-target-only/plugins.md](https://github.com/Hierosoft/nomcproxy/blob/main/install-on-target-only/plugins.md).
 
 ## Jobs (professions)
 
@@ -82,7 +82,7 @@ List your homes:
 ```
 
 In the Tekkit Classic / 1.2.5 Essentials version, right-clicking a bed sets only the special named home `bed`. <br>
-Plain `/home` uses the location set by `/sethome`. See the notes in [install-on-target-only/plugins.md](https://github.com/Hierosoft/nomcproxy/blob/main/install-on-target-only/plugins.md) for how the server is configured so that beds are the intended way to set a home.
+Plain `/home` uses the location set by `/sethome`. See the notes in [install-on-target-only/plugins.md](https://github.com/Hierosoft/nomcproxy/blob/main/install-on-target-only/plugins.md) for how the server is configured (PermissionsEx) so that beds are the intended way to set a home.
 
 ## Lockette
 

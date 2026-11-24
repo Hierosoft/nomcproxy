@@ -10,7 +10,7 @@ After editing any of these files, reload the plugin or restart the server.
 ## Compatible plugin versions
 
 Versions below are the latest known-compatible builds for each era (or the exact version already determined for this restore). <br>
-Essentials GroupManager has not been installed yet; the version listed is the one that ships with the matching Essentials release for that Minecraft version.
+PermissionsEx is the recommended permissions plugin for 1.2.5 (see [permissionsex.md](permissionsex.md)). GroupManager is an optional alternative (2.9.2 is no longer distributed).
 
 ### 1.2.5 (such as Tekkit Classic)
 
@@ -22,7 +22,7 @@ Essentials GroupManager has not been installed yet; the version listed is the on
 | Lockette | 1.7.2 / 1.7.3 | For CB 1.2.5-R5.0. |
 | Dynmap | 0.40 (or 0.38–0.60) | Compatible with 1.2.5. |
 | ZavAutoMessager | 1.8.4 | Explicitly for 1.2.5. |
-| Essentials + GroupManager | Essentials 2.9.2 (Tekkit build) | GroupManager jar that ships with it. Not yet installed. Official last Bukkit GroupManager: [EssentialsGroupManager.jar](https://github.com/essentials/Essentials/releases/download/gm-final/EssentialsGroupManager.jar) (gm-final tag). |
+| Essentials + PermissionsEx | Essentials 2.9.2 (Tekkit build) | PermissionsEx 1.19.3 is recommended; see [permissionsex.md](permissionsex.md). GroupManager is an optional alternative (2.9.2 is no longer distributed; can be compiled). |
 
 ### 1.5.2 (such as Blightfall or Hexxit)
 
@@ -116,62 +116,74 @@ These plugins were used mainly through commands and signs rather than yml edits 
 WorldGuard regions are stored in their own region files and are managed with the commands in [../commands.md](../commands.md). <br>
 Lockette protection is per-chest via signs; there is no central yml that lists protected chests.
 
-## Essentials GroupManager
+## PermissionsEx
 
-GroupManager is the permissions system that ships with Essentials (the version compatible with Bukkit 1.2.5). <br>
-It is a separate jar (`EssentialsGroupManager.jar` or `GroupManager.jar`) that must be placed in the `plugins` folder. Do not install both the Essentials-bundled jar and a standalone GroupManager at the same time.
-
-It lets you define groups (ranks) and assign players to them. Each group has a list of permission nodes. Players inherit the permissions of their primary group (and any sub-groups). <br>
+PermissionsEx is the recommended permissions plugin for Tekkit Classic / Bukkit 1.2.5. <br>
+It lets you define groups (ranks) and assign players to them. Each group has a list of permission nodes. Players inherit the permissions of their primary group (and any groups it inherits). <br>
 This is how moderators, builders, and other roles are created without giving full operator status.
 
-### Typical default groups
+Install and the basic `permissions.yml` layout are in [permissionsex.md](permissionsex.md). Use PermissionsEx 1.19.3 (later 1.22/1.23 builds are not compatible with 1.2.5).
 
-A fresh GroupManager config usually includes:
+### Typical groups
 
-- **Default** – new players join this group automatically.
+A starting layout usually includes:
+
+- **Guest** or **Member** – new players (the group with `default: true`).
 - **Builder** – basic building permissions.
 - **Moderator** – moderate chat, kick, etc. (exact nodes depend on what you add).
-- **Admin** / **Owner** – higher privileges.
+- **Admin** – higher privileges.
 
-You can rename or add groups. Group definitions live in:
+You can rename or add groups. Everything lives in one file:
 
-- `plugins/GroupManager/globalgroups.yml` (global groups)
-- `plugins/GroupManager/worlds/<world>/groups.yml` (per-world groups; inheritance is common)
+- `plugins/PermissionsEx/permissions.yml`
 
-User assignments are in `plugins/GroupManager/worlds/<world>/users.yml`.
+(The root-directory `permissions.yml` is Bukkit’s own file; PermissionsEx ignores it.)
 
 ### Creating a moderator
 
 1. Make sure a Moderator (or similar) group exists and has the desired permission nodes (e.g. `essentials.kick`, `essentials.mute`, `essentials.ban`, Towny or WorldGuard nodes as needed). <br>
-   Add nodes with `/mangaddp Moderator essentials.kick` or by editing the yml and running `/manload`.
+   Add nodes with `/pex group Moderator add essentials.kick` or by editing `permissions.yml` and running `/pex reload`.
 
 2. Assign the player:
 
    ```
-   /manuadd <player> Moderator
+   /pex user <player> group set Moderator
    ```
 
-3. Reload if you edited files by hand:
+3. Reload if you edited the file by hand:
 
    ```
-   /manload
+   /pex reload
    ```
 
 The player should now have the group’s permissions without being OP. <br>
-Check with `/manwhois <player>` or `/manglistp Moderator`.
+Check with `/pex user <player>` or `/pex groups`.
 
 ### Useful commands
 
 Full command list is in [../commands.md](../commands.md). Key ones:
 
-- `/manuadd <player> <group>` – set primary group
-- `/mangaddp <group> <permission>` – add a permission node
-- `/manload` – reload configuration
-- `/listgroups` – show defined groups
+- `/pex user <player> group set <group>` – set primary group
+- `/pex group <group> add <node>` – add a permission node
+- `/pex group <group> remove <node>` – remove a permission node
+- `/pex reload` – reload configuration
+- `/pex groups` – show defined groups
 
 Permission nodes are plugin-specific (e.g. `jobs.join.Miner`, `towny.command.town.new`, `worldguard.region.define`). Consult each plugin’s documentation or the permission lists that appear when you run commands as OP.
 
-After changing GroupManager files or commands, the new permissions take effect immediately for online players in most cases, or after the next login / `/manload`.
+After changing `permissions.yml` or running these commands, the new permissions take effect after `/pex reload` (or on the next login).
+
+### GroupManager (alternative)
+
+(2.9.2 is no longer distributed but can be compiled. PermissionsEx is recommended.)
+
+GroupManager is the permissions system that used to ship with Essentials. It is a separate jar (`EssentialsGroupManager.jar` or `GroupManager.jar`). Do not install it at the same time as PermissionsEx.
+
+It operates the same way (groups of permission nodes, inheritance, assign a player to a group). Differences:
+
+- Config is not a single `permissions.yml`. Groups live in `plugins/GroupManager/globalgroups.yml` and `plugins/GroupManager/worlds/<world>/groups.yml`. User assignments are in `plugins/GroupManager/worlds/<world>/users.yml`.
+- Commands differ: `/manuadd <player> <group>` instead of `/pex user <player> group set <group>`; `/mangaddp <group> <node>` instead of `/pex group <group> add <node>`; `/mangdelp <group> <node>` instead of `/pex group <group> remove <node>`; `/manload` instead of `/pex reload`; `/listgroups` instead of `/pex groups`.
+- A fresh GroupManager config often names the default group **Default** (not Guest/Member). Adjust the group name in the examples above.
 
 ## Essentials homes and the bed home (1.2.5 / Tekkit Classic)
 
@@ -197,24 +209,36 @@ There is no `bed-sethome` option in this version’s `config.yml` (the Essential
 
    Then run `/ess reload`.
 
-2. In GroupManager, give the Default (or player) group these nodes and **remove** `essentials.sethome` (and any `essentials.sethome.multiple.*` nodes):
+2. Give the Member (or player) group these nodes and **remove** `essentials.sethome` (and any `essentials.sethome.multiple.*` nodes):
 
    - `essentials.home`
    - `essentials.home.bed`
    - `essentials.sethome.bed`
 
-   Example (as OP):
+   Example (as OP or from console; adjust the group name to match your `permissions.yml`):
 
    ```
-   /mangaddp Default essentials.home
-   /mangaddp Default essentials.home.bed
-   /mangaddp Default essentials.sethome.bed
-   /mangdelp Default essentials.sethome
-   /manload
+   /pex group Member add essentials.home
+   /pex group Member add essentials.home.bed
+   /pex group Member add essentials.sethome.bed
+   /pex group Member remove essentials.sethome
+   /pex reload
    ```
+
+   Or edit `plugins/PermissionsEx/permissions.yml` directly (single-dash grants the node; a leading double-dash negates it) and then `/pex reload`.
 
 Players can then set a home only by right-clicking a bed, and they reach it with `/home bed`. <br>
 Plain `/home` will not go to the bed home in this version.
+
+### GroupManager (alternative)
+
+The same three nodes (and the removal of `essentials.sethome`) apply. Differences:
+
+- Add them with `/mangaddp Default essentials.home`, `/mangaddp Default essentials.home.bed`, `/mangaddp Default essentials.sethome.bed`, and `/mangdelp Default essentials.sethome`.
+- Reload with `/manload` instead of `/pex reload`.
+- The group is usually named **Default**, and the nodes are stored in `plugins/GroupManager/worlds/<world>/groups.yml` (not `plugins/PermissionsEx/permissions.yml`).
+
+See [permissionsex.md](permissionsex.md) for the PermissionsEx install and basic group layout.
 
 Player-facing commands for this are listed in [../player-commands.md](../player-commands.md).
 

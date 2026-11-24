@@ -20,7 +20,10 @@ After joining a job you can see your stats using `/jobs stats`.
 ## Elevators
 
 Create elevators using LIFT: <br>
-http://www.youtube.com/watch?v=k-IT_ULndbE
+Place an iron block. Stand on it. Place a button on a block directly in front of you. Place a blank sign above that. Optionally, place a sign below the button with the floor name. <br>
+Repeat the same layout directly above for higher floors, but use a glass block instead of iron. Do not place any blocks between the blocks where you stand. <br>
+Right-click each sign to update it. <br>
+Video: http://www.youtube.com/watch?v=k-IT_ULndbE
 
 ## Help / tickets
 

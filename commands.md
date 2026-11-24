@@ -187,55 +187,76 @@ dynmap fullrender <world>
 
 Default web port is 8123. After the port is published, the map is at `http://<server-ip>:8123`.
 
-## GroupManager (Essentials)
+## PermissionsEx
 
-Commands for the GroupManager version that ships with Essentials (compatible with Bukkit 1.2.5 era). <br>
-Full explanation of groups, default ranks, and how to create moderators is in [install-on-target-only/plugins.md](install-on-target-only/plugins.md).
+Commands for PermissionsEx (the recommended permissions plugin for Tekkit Classic / 1.2.5). <br>
+Install and the basic `permissions.yml` layout are in [install-on-target-only/permissionsex.md](install-on-target-only/permissionsex.md). Groups and moderator setup are in [install-on-target-only/plugins.md](install-on-target-only/plugins.md).
 
-Add a player to a group (creates the user entry if it does not exist):
-
-```
-/manuadd <player> <group>
-```
-
-Remove a player’s group-specific settings (they return to the default group):
+Assign a player to a group:
 
 ```
-/manudel <player>
-```
-
-Create a new group:
-
-```
-/mangadd <group>
+/pex user <player> group set <group>
 ```
 
 Add a permission node to a group:
 
 ```
-/mangaddp <group> <permission>
+/pex group <group> add <permission>
+```
+
+Remove a permission node from a group:
+
+```
+/pex group <group> remove <permission>
+```
+
+Create a new group:
+
+```
+/pex group <group> create
 ```
 
 List groups:
 
 ```
-/listgroups
+/pex groups
 ```
 
-Reload GroupManager after editing its yml files:
+Reload after editing `plugins/PermissionsEx/permissions.yml`:
 
 ```
-/manload
+/pex reload
 ```
 
-Common groups on a fresh install include Default, Builder, Moderator, Admin, and Owner. <br>
+Common groups include Guest or Member (default), Builder, Moderator, and Admin. <br>
 To make someone a moderator, typically:
 
 ```
-/manuadd <player> Moderator
+/pex user <player> group set Moderator
 ```
 
-(Adjust the group name to match what is defined in `plugins/GroupManager/worlds/<world>/groups.yml`.)
+(Adjust the group name to match what is defined in `plugins/PermissionsEx/permissions.yml`.)
+
+### GroupManager (alternative)
+
+(2.9.2 is no longer distributed but can be compiled. PermissionsEx is recommended.)
+
+It operates the same way (groups of permission nodes, assign a player to a group). Differences:
+
+- Config is in `plugins/GroupManager/worlds/<world>/groups.yml` and `plugins/GroupManager/worlds/<world>/users.yml` (plus `plugins/GroupManager/globalgroups.yml`), not `plugins/PermissionsEx/permissions.yml`.
+- Command mapping:
+
+  | PermissionsEx | GroupManager |
+  |---------------|--------------|
+  | `/pex user <player> group set <group>` | `/manuadd <player> <group>` |
+  | `/pex group <group> add <permission>` | `/mangaddp <group> <permission>` |
+  | `/pex group <group> remove <permission>` | `/mangdelp <group> <permission>` |
+  | `/pex group <group> create` | `/mangadd <group>` |
+  | `/pex groups` | `/listgroups` |
+  | `/pex reload` | `/manload` |
+
+- `/manudel <player>` removes a player’s group-specific settings (they return to the default group). There is no direct PermissionsEx equivalent in the short list above; use `/pex user <player> group set <default-group>` instead.
+- The default group is often named **Default**.
 
 ## Pterodactyl
 
