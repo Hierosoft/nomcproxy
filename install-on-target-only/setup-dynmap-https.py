@@ -68,16 +68,33 @@ def load_target_settings() -> OrderedDict:
         sys.exit(1)
 
 
+DEFAULT_PORT = 8123
+
+
+class DynmapTargetParser(argparse.ArgumentParser):
+    def error(self, message: str) -> None:
+        self.print_usage(sys.stderr)
+        echo0(f"{self.prog}: error: {message}")
+        if "--port" in message and "required" in message:
+            # Show an example using exactly the arguments the user gave
+            # (or just the program name if none) plus --port and the default.
+            given = sys.argv[1:] if len(sys.argv) > 1 else []
+            example_args = " ".join(given) if given else ""
+            example = f"{sys.argv[0]} {example_args} --port {DEFAULT_PORT}".strip()
+            echo0("Example:")
+            echo0(example)
+        sys.exit(2)
+
+
 def main() -> int:
-    parser = argparse.ArgumentParser(
+    parser = DynmapTargetParser(
         description="Record the Dynmap port on the target (no local HTTPS / subdomain).",
-        epilog="Example: sudo python3 install-on-target-only/setup-dynmap-https.py --port 8123",
     )
     parser.add_argument(
         "--port",
         type=int,
         required=True,
-        help="Dynmap listen port on this machine (example: 8123)",
+        help=f"Dynmap listen port on this machine (default example: {DEFAULT_PORT})",
     )
     args = parser.parse_args()
 

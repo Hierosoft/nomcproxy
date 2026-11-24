@@ -1070,3 +1070,10 @@ Make sure there is a newline at the end of each code or md file.
 Update AGENTS.md if necessary and provide it.
 
 in plugins.md, show what version of plugin would be necessary (latest compatible in cases we haven't determined yet [or haven't installed yet in the case of Essentials GroupManager], or exact version if we determined what I actually have. Make a separate list for "1.2.5 (such as Tekkit Classic)" and "1.5.2 (such as Blightfall or Hexxit)".
+
+You forgot to say the default port in the example when port isn't specified for the dynmap target setup. The output is just:
+```
+usage: setup-dynmap-https.py [-h] --port PORT
+setup-dynmap-https.py: error: the following arguments are required: --port
+```
+After that say "Example:" Then show an example with exactly the arguments given (if none then just sys.argv 0) plus --port (followed by the default dynmap port number)
