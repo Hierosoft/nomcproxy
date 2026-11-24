@@ -1126,3 +1126,9 @@ Make a player-help.md file and make the other player help files refer to it. Con
 - 2026-11-23
 
 Add text after the links: Version-specific notes are in [player-help-1.2.5.md](https://github.com/Hierosoft/nomcproxy/blob/main/player-help-1.2.5.md) (such as Tekkit Classic) and [player-help-1.5.2.md](https://github.com/Hierosoft/nomcproxy/blob/main/player-help-1.5.2.md) (such as Hexxit & Blightfall)
+
+For crafting recipes, use 3x3 markdown tables. Show a few often-used recipes for tekkit classic, and ones that differ from vanilla 1.2.5.
+
+Use emojis as much as possible for ingredients in grids.
+
+Re-read all player help files where you've described how to craft anything, and use grids instead (emoji where possible).

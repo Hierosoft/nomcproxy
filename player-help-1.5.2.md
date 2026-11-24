@@ -35,16 +35,36 @@ Ore distribution in this era is the same as 1.2.5; the modern [Ore](https://mine
 ## Fences and gates
 
 ### Wooden fence
-Craft with 6 sticks (3×2 vertical). Connects to other wooden fences and fence gates. <br>
+6 sticks in two vertical columns. Connects to other wooden fences and fence gates. <br>
 Mobs cannot jump over a single fence. Collision box is 1.5 blocks tall.
 
+| | | |
+|---|---|---|
+| | 🪵 | 🪵 |
+| | 🪵 | 🪵 |
+| | 🪵 | 🪵 |
+
 ### Nether brick fence
-Craft with 6 nether bricks. Fireproof and stronger. Generates in nether fortresses. <br>
+6 nether bricks. Fireproof and stronger. Generates in nether fortresses. <br>
 Does not visually connect directly to wooden fences (use a gate between them).
 
+| | | |
+|---|---|---|
+| | 🧱 | 🧱 |
+| | 🧱 | 🧱 |
+| | 🧱 | 🧱 |
+
 ### Fence gate
-Craft with 4 sticks + 2 wooden planks. Opens by right-click or redstone. <br>
+4 sticks + 2 wooden planks. Opens by right-click or redstone. <br>
 Connects to both wooden and nether brick fences.
+
+| | | |
+|---|---|---|
+| | | |
+| 🪵 | 🪵 | 🪵 |
+| 🪵 | 🪵 | 🪵 |
+
+**Emoji key (vanilla):** 🪵 Stick or Wooden Planks · 🧱 Nether Brick
 
 See [Fence – Minecraft Wiki](https://minecraft.wiki/w/Fence) and [Fence Gate – Minecraft Wiki](https://minecraft.wiki/w/Fence_Gate).
 

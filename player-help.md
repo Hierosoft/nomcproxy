@@ -1,9 +1,9 @@
 # Player help
 
 Main player help for the server. <br>
-Version-specific notes are in [player-help-1.2.5.md](player-help-1.2.5.md) (such as Tekkit Classic) and [player-help-1.5.2.md](player-help-1.5.2.md) (such as Hexxit & Blightfall). <br>
 Non-OP commands are listed in [player-commands.md](https://github.com/Hierosoft/nomcproxy/blob/main/player-commands.md). <br>
-Admin / OP commands are in [commands.md](https://github.com/Hierosoft/nomcproxy/blob/main/commands.md).
+Admin / OP commands are in [commands.md](https://github.com/Hierosoft/nomcproxy/blob/main/commands.md). <br>
+Version-specific notes are in [player-help-1.2.5.md](https://github.com/Hierosoft/nomcproxy/blob/main/player-help-1.2.5.md) (such as Tekkit Classic) and [player-help-1.5.2.md](https://github.com/Hierosoft/nomcproxy/blob/main/player-help-1.5.2.md) (such as Hexxit & Blightfall).
 
 ## Protecting your stuff
 

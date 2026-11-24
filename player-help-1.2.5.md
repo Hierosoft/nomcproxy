@@ -34,15 +34,35 @@ Ore distribution in this era is described in older references; the modern [Ore](
 ## Fences and gates
 
 ### Wooden fence
-Craft with 6 sticks (3×2 vertical). Connects to other fences and fence gates. <br>
+6 sticks in two vertical columns. Connects to other fences and fence gates. <br>
 Mobs cannot jump over a single fence.
 
+| | | |
+|---|---|---|
+| | 🪵 | 🪵 |
+| | 🪵 | 🪵 |
+| | 🪵 | 🪵 |
+
 ### Nether brick fence
-Craft with 6 nether bricks. Fireproof and stronger. Generates in nether fortresses.
+6 nether bricks. Fireproof and stronger. Generates in nether fortresses.
+
+| | | |
+|---|---|---|
+| | 🧱 | 🧱 |
+| | 🧱 | 🧱 |
+| | 🧱 | 🧱 |
 
 ### Fence gate
-Craft with 4 sticks + 2 wooden planks. Opens by right-click or redstone. <br>
+4 sticks + 2 wooden planks. Opens by right-click or redstone. <br>
 Connects to both wooden and nether brick fences.
+
+| | | |
+|---|---|---|
+| | | |
+| 🪵 | 🪵 | 🪵 |
+| 🪵 | 🪵 | 🪵 |
+
+**Emoji key (vanilla):** 🪵 Stick or Wooden Planks · 🧱 Nether Brick
 
 See [Fence – Minecraft Wiki](https://minecraft.wiki/w/Fence) and [Fence Gate – Minecraft Wiki](https://minecraft.wiki/w/Fence_Gate).
 
@@ -67,6 +87,14 @@ More than a decorative fence. <br>
 - Stack them to make a pole. Hold crouch to slide down quickly (no fall damage).
 - With a Magnetizer and Magnetic Boots (Iron/Gold/Nano/Quantum), standing near a powered Iron Fence pole lifts you upward.
 
+6 Refined Iron (top two rows):
+
+| | | |
+|---|---|---|
+| 🔩 | 🔩 | 🔩 |
+| 🔩 | 🔩 | 🔩 |
+| | | |
+
 Recipe and details: [Iron Fence – Tekkit Classic Wiki](https://tekkitclassic.fandom.com/wiki/Iron_Fence).
 
 #### Gated Track (Railcraft)
@@ -86,7 +114,79 @@ An Equivalent Exchange item that repairs tools and armor before they break. <br>
   - High → diamond tools and armor.
 - Placing the Talisman on a DM Pedestal or inside an Alchemical Chest with the tools repairs them without consuming dust (slowly).
 
+| | | |
+|---|---|---|
+| 🟢 | 🧵 | 🔴 |
+| 🔵 | 📄 | 🔵 |
+| 🔴 | 🧵 | 🟢 |
+
+**Emoji key (EE):** 🟢 Low Covalence Dust · 🔵 Medium Covalence Dust · 🔴 High Covalence Dust · 🧵 String · 📄 Paper
+
 Recipe and full list: [Talisman of Repair – Tekkit Classic Wiki](https://tekkitclassic.fandom.com/wiki/Talisman_of_Repair).
+
+### Common crafting recipes (Tekkit Classic)
+
+These are early IndustrialCraft² and Equivalent Exchange items that do not exist in vanilla 1.2.5. <br>
+Refined Iron is made by smelting a normal Iron Ingot again. <br>
+Always use a Wrench to pick up machines that contain a Machine Block.
+
+#### Machine Block
+8 Refined Iron in a ring:
+
+| | | |
+|---|---|---|
+| 🔩 | 🔩 | 🔩 |
+| 🔩 | | 🔩 |
+| 🔩 | 🔩 | 🔩 |
+
+#### RE Battery
+(First make Copper Cable from 3 Copper Ingots in a row, then Insulated Copper Cable by surrounding it with Rubber.)
+
+| | | |
+|---|---|---|
+| | | |
+| 🪙 | 🔌 | 🪙 |
+| | 🔴 | |
+
+#### Generator
+(Basic coal-powered EU source.)
+
+| | | |
+|---|---|---|
+| | 🔋 | |
+| | ⬛ | |
+| | 🔥 | |
+
+#### BatBox
+(Stores up to 40,000 EU. Output face is the side with the orange dot; change it with a Wrench.)
+
+| | | |
+|---|---|---|
+| 🪵 | 🔌 | 🪵 |
+| 🔋 | 🔋 | 🔋 |
+| 🪵 | 🪵 | 🪵 |
+
+#### Macerator
+(Doubles most ores into dust that can be smelted into 2 ingots.)
+
+| | | |
+|---|---|---|
+| 🪨 | 🪨 | 🪨 |
+| 🪨 | ⬛ | 🪨 |
+| | 🔌 | |
+
+#### Philosopher’s Stone (Equivalent Exchange)
+(Used to transmute blocks and craft higher EE fuels. Returned after most crafts.)
+
+| | | |
+|---|---|---|
+| ✨ | 🔴 | ✨ |
+| 🔴 | 💎 | 🔴 |
+| ✨ | 🔴 | ✨ |
+
+**Emoji key:** 🔩 Refined Iron · 🪙 Tin · 🔌 Insulated Copper Cable / Electronic Circuit · 🔴 Redstone · 🔋 RE Battery · ⬛ Machine Block · 🔥 Furnace · 🪵 Wooden Planks · 🪨 Flint or Cobblestone · ✨ Glowstone Dust · 💎 Diamond
+
+Full recipes and more machines: [Tekkit Classic Wiki](https://tekkitclassic.fandom.com/wiki/Main_Page) (search for the item).
 
 ### Further reading
 
