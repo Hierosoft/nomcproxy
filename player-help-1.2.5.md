@@ -1,6 +1,7 @@
 # Player help: Minecraft 1.2.5 and Tekkit Classic
 
 Short notes on differences from modern Minecraft that affect everyday play. <br>
+This is a version-specific supplement to the main [player-help.md](player-help.md). <br>
 For full details follow the wiki links. This page is not a complete guide.
 
 ## Build height

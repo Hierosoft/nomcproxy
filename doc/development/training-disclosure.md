@@ -1111,3 +1111,14 @@ Add a player-help-1.2.5.md . Add subheadings like mining depths specific to MC 1
 Add a player-help-1.5.2.md with a similar structure with a Hexxit 2nd level heading, and later a  Blightfall 2nd level heading. Use same philosophy: Succinct and using outlinks except with regard to core differences from modern Minecraft.
 
 You linked to https://minecraft.wiki/w/Altitude which is for modern Minecraft--those altitudes don't apply to 1.2.5 nor 1.5.2. Make sure you don't use any misleading modern Minecraft links.
+
+Make a player-help.md file and make the other player help files refer to it. Consider this document to be the main help file. Make it link to the commands file. The new file should at least have the following stuff, so I don't need ZavAutoMessager to say all this:
+- 'Use &aLockette&r to protect your stuff: place sign on chest, above door (on iron
+  doors to avoid powering them)'
+- 'Protect blocks with &aTowny&r: Create a town, then gain and maintain power (through
+  survival) to keep block protection (except during wars)'
+- Make money with &aJobs&r (harvest, build, etc)! Type:%n &e/jobs browse&r%n after joining a job you can see your stats using:%n &e/jobs stats&r
+- Create elevators using &aLIFT&r:%n &nhttp://www.youtube.com/watch?v=k-IT_ULndbE&r
+- In to get &ahelp&r type &e/ticket&r then your message. The ticket will be sent even if moderators are offline.
+- To see the list of Tekkit Classic mods, see &nhttps://www.technicpack.net/modpack/tekkit.552560/mods&r
+- To go back to your last-used bed, type &n/home bed&r
