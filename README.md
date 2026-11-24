@@ -97,7 +97,7 @@ tail -f /var/log/nomcproxy.log
 
 ## Setting up the target (home) server
 
-nomcproxy runs **only** on the VPS (the machine players connect to).  
+nomcproxy runs **only** on the VPS (the machine players connect to). <br>
 The actual Minecraft server runs on a separate machine (usually your home server).
 
 ### What goes where
@@ -111,7 +111,7 @@ The actual Minecraft server runs on a separate machine (usually your home server
 
 1. On the home server, use a dynamic DNS hostname (recommended) or a static public IP so the VPS can reach it.
 2. Keep that hostname and IP **private**. Do not give it to players.
-3. Give players the **VPS WAN IP** (or a domain that points at the VPS).  
+3. Give players the **VPS WAN IP** (or a domain that points at the VPS). <br>
    You can discover the VPS WAN IP with:
    ```bash
    curl -s https://api.ipify.org

@@ -10,15 +10,15 @@ This folder is part of the [nomcproxy](https://github.com/Hierosoft/nomcproxy) p
 
 ## Why a dynamic hostname on the home side
 
-Home and typical residential connections rarely have a static public IP.  
-Use a dynamic DNS hostname so the public proxy can always reach this server.  
+Home and typical residential connections rarely have a static public IP. <br>
+Use a dynamic DNS hostname so the public proxy can always reach this server. <br>
 Keep that hostname and the home IP private — give players only the public proxy’s address (or a domain that points at the proxy).
 
 ## What gets installed here
 
 When you run one of the install scripts in this folder it will:
 
-- Place server files under `/opt/minecraft/<name>`  
+- Place server files under `/opt/minecraft/<name>` <br>
   (`vanilla` or `1.7.10-blightfall`)
 - Record the installed name in `/opt/minecraft/nomcproxy.list` (no duplicates)
 - Copy this file to `/opt/minecraft/server.md`

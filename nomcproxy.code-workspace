@@ -4,5 +4,17 @@
 			"path": "."
 		}
 	],
-	"settings": {}
+	"settings": {
+		"cSpell.words": [
+			"DNAT",
+			"dport",
+			"Dynmap",
+			"Lockette",
+			"nftables",
+			"Tekkit",
+			"tlnp",
+			"Trixie",
+			"Weaponsmith"
+		]
+	}
 }

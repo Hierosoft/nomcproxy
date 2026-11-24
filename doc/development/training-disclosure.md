@@ -861,7 +861,7 @@ How do we know that a panel user invite e-mail got sent? I don't even know if I 
 
 The settings are blank. Is there any way to get the invite link now, or resend after I fix the settings?
 ```
- root@birdo:/opt/git/nomcproxy# grep ^MAIL_ /var/www/pterodactyl/.env
+ root@redacted:/opt/git/nomcproxy# grep ^MAIL_ /var/www/pterodactyl/.env
 MAIL_MAILER=smtp
 MAIL_HOST=smtp.example.com
 MAIL_PORT=25
@@ -959,3 +959,114 @@ Traceback (most recent call last):
                              output=stdout, stderr=stderr)
 subprocess.CalledProcessError: Command '['/opt/nomcproxy/minestat-discord-venv/bin/python', '-m', 'pip', 'install', '--upgrade', 'minestat', 'requests']' returned non-zero exit status 1.
 ```
+
+## commands.md, dynmap.md, install-on-target-only/mc-settings.md, install-on-target-only/plugins.md, install-on-target-only/setup-dynmap-https.py, setup-dynmap-proxy.py, player-commands.md, AGENTS.md, README.md
+- 2026-11-22 https://grok.com/project/b8272a8f-a09e-43d8-ad63-47993cc1b213?chat=1f18f590-192b-49ef-90e9-5e51e7639dc7
+
+In Pterydactyl I already have 2 working servers, Blightfall and Hexxit (So I have Java 8 already). How do I add a server with the tekkit classic egg (I have the file on my client doing remote management)?
+
+In the new server form, what settings should I use for 3-5 users? Mention every required field.
+
+I want to use port 25567. Do I need to make a new allocation before getting to this screen, or what do I exactly enter?
+
+Adjust recommendations based on the target server if necessary:
+- paste output of `lscpu`
+
+Can the 2nd user manage the new 3rd server or not, and how do I set their permission to be able to start and stop it etc?
+- attach screenshot of servers list
+
+I don't see any users or subusers tab.
+- paste screenshot of admin mode
+  - answer was to not use admin mode to add users to a server.
+
+I am restoring an old world. it has Towny. Can i make sure towny doesn't uproot all the crops and expire all the chunk and/or lock ownership? I though there may have been a feature that did that, but I am not sure if it was Towny, and I don't know how to avoid that by changing the settings in the MC 1.2.5 version of Towny before starting the server and loading chunks. Server console (On pterydactyl, before login using Minecraft)? yml files? Not applicable (no such feature in towny and/or this version of it)?
+
+I set plot management revert to false. Focus on the settings I actually have (unless others are implied):
+- paste various config files. See commands.md and plugins.md
+
+how set default res in tekkit classic client?
+
+It didn't work, and after launch & close it deleted the fields. Is there any other way such as in technic launcher, or specific to MC 1.2.5?
+
+I renamed a dat file and have my items, but can't build. If I op myself from the server console, how can I then fix this claim? Or do we have to claim an area before we can build? Maybe it already expired when i started the server without changing the upkeep etc settings (but didn't log in)?
+
+/town here says nothing. Also, I can only run that as op. If I deop, why does it still say no permission to build?
+
+It already said:
+```
+unclaimedZoneBuild=true
+unclaimedZoneDestroy=true
+unclaimedZoneSwitch=true
+unclaimedZoneItemUse=true
+unclaimedZoneName=Wilderness
+```
+That's all I checked so far. Lets go step by step.
+
+Other people can build tho
+- attach screenshot of `/towny map`
+
+"You don't have permission for this area." when I build. Maybe it is a protection mod? Essentials? output of /res is attached
+- attach screenshot of `/res`
+
+redacted1 is my old username. redacted2 is my new one. /rg info result is attached
+
+Considering the mod list I showed earlier (only active ones, not ones in extra folders I made for non-working plugins or versions), what is a proper way for non-op players to protect their area? Only towny in that case, or what?
+
+How add someone to a Lockette chest?
+
+what command will reload plugins/ZavAutoMessager/config.yml
+
+How do I transfer ownership of this property owned by my old username?
+- paste screenshot with `[Towny] Outsiders aren't allowed to switch.`
+
+How do i reload towny settings?
+
+How do I make a new region for a specific player, or is it always the maker by default?
+
+Live map was working on here at one point. How can I get it working? How can I test if it is already working using the LAN, before we continue?
+
+It says refused to connect. Do I need an explicit angie setup? Assume the target server is redacted.example.com (home server, redacted = 192.168.1.x), and the proxy (using angie stream proxy) is example.com (VPS)
+
+I don't have ufw. I have trixie. Explain what things I should check based on that (started around debian 9, then kept upgrading, some settings or default packages may be old, unless upgrades change that)
+
+root@redacted:/var/lib/pterodactyl/volumes/redacted-guid# ss -tlnp | grep 8123
+root@redacted:/var/lib/pterodactyl/volumes/redacted-guid# netstat -tlnp | grep 8123
+-bash: netstat: command not found
+
+I did the port allocation so far, but browsing via lan still says refused to connect.
+- paste output of ufw and iptables checks (neither are running)
+
+I assigned the allocation to the server. Is there any way to get docker to respect the change immediately without restarting?
+
+Port mapping in pterydactyl is already correct. Can't I do a temporary fix, or will that mess something up?
+- answer: it will not mess anything up, it will just not be persistent, and the stored settings will take effect on restart of the server (container)
+
+It works in the browser now. Add a commands.md which goes over all the commands we explored, with a 2nd-level heading (`##`) for each mod name. Add a dynmap.md that explains the manual steps necessary in Pterydactyl (including exact steps to assign the allocation to the server). Before that, add a section explaining that a subdomain must be created such as "dynmap.example.com" on the DNS provider. Add a section to the bottom explaining potential firewall steps, with an additional "Optional" subheading explaining the temporary workaround to make a temporary config to make it work before restart. See if you can make a setup-dynmap-https.py in the install-on-target-only folder that will do a similar https workaround as we used for the other forwarded stuff.  It should also make an nginx conf. It should use the json generated from the initial setup, and require a port argument (8123 should be in the example when the arg is missing). A subdomain argument should not be present--always do dynmap as the subdomain on the target and proxy to keep it simple. Make a setup-dynmap-proxy.py (not in the install-on-target-only folder) that also requires a port (shows 8123 in example if arg is missing as well) sets up a necessary conf file on the proxy, and uses the settings json generated by the intial setup (or errors out and says to run the correct setup file first--and vise versa for the other script). If it detects we are on the target, error out and explain that the opposite script should run (setup-dynmap-https.py). Make sure we explain the order in which the scripts should be run (target or proxy first) and detect if the other one has been configured (whichever one is the first step).
+
+Will it simplify the https if we only make the proxy address allow https and avoid fixing the direct typing of the proxy dynamic hostname on the browser (assuming we can still forward to proxy address and port; and assuming we don't do any subdomain on the target)?
+
+For minecraft commands, show a template style instead of a possibly misleading example (avoid copy-paste errors). For example, change `/townyadmin town TownName add NewName` to `/townyadmin town <town> add <player2>`
+
+Go over the configuration settings we discussed, and explain what settings the server owner may which to change (don't state the changes I wanted as required). Make a new file called plugins.md that focuses on the yml files, whereas commands.md will focus on commands. The documents can also refer to each other. If there are ways for the same settings changes to be accomplished using commands, put that method in commands.md, but only if there is a way to make the changes permanent (save current settings to config.yml). If there are any redundancies in plugins.md, that's ok, but make sure it is noted that all (or certain) of these changes can be done using commands and to see commands.md (in cases where commands can make them permanent).
+
+Move plugins.md to install-on-target-only folder, and add a new Minecraft Server document mc-settings.md for any server.property settings that are relevant such as the basename for the world etc discussed elsewhere in this project. Make the documents refer to each other. The commands.md can stay in the main folder, since commands are done on the proxy via Pterydactyl, or using the Minecraft client matching the individual server.
+
+- 2026-11-23 https://grok.com/project/b8272a8f-a09e-43d8-ad63-47993cc1b213?chat=68586cfc-0beb-4c8b-8a66-1ae361b0cfeb
+
+help me use CLI on linux to rename Henry_Nautilis to Henry_Nautilus in this file
+
+is there a way to reload it in the jobs plugin for MC 1.2.5 without restarting the server?
+
+Add jobs commands (For this version) to commands.md and these instructions and ways to create moderators (and an explanation of Essentials GroupManager [the version that is compatible] which I plan to add) to plugins.md and make a player-commands.md that is for non-op players and could be used to generate a helpful public web page. Move commands there as appropriate, and link to the other document. The players document can be in the main folder not the only on target folder, since the web page generated would be on the main website, not hosted the streamed/proxied machine.
+
+Actually, player-commands.md should not link back to the main admin docs, since it could be used to generate a public page. The commands document should link to the player commands md though.
+
+Actually, restore the links, that's ok, but use the full URL to the document under github.com/Hierosoft/nomcproxy (represent it as a relative url in the visible text portion of the markdown link). The links in other md files can remain relative.
+
+Review whitespace at end of line(s) in all md files. Use a different formatting method than whitespace at the end of lines (some markdown readers may ignore it, and git complains about it). Remove whitespace at the ends of lines in general.
+
+Make sure there is a newline at the end of each code or md file.
+
+Update AGENTS.md if necessary and provide it.
+
+in plugins.md, show what version of plugin would be necessary (latest compatible in cases we haven't determined yet [or haven't installed yet in the case of Essentials GroupManager], or exact version if we determined what I actually have. Make a separate list for "1.2.5 (such as Tekkit Classic)" and "1.5.2 (such as Blightfall or Hexxit)".
