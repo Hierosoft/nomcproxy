@@ -9,7 +9,7 @@ After editing any of these files, reload the plugin or restart the server.
 
 ## Compatible plugin versions
 
-Versions below are the latest known-compatible builds for each era (or the exact version already determined for this restore).  
+Versions below are the latest known-compatible builds for each era (or the exact version already determined for this restore). <br>
 Essentials GroupManager has not been installed yet; the version listed is the one that ships with the matching Essentials release for that Minecraft version.
 
 ### 1.2.5 (such as Tekkit Classic)
@@ -22,7 +22,7 @@ Essentials GroupManager has not been installed yet; the version listed is the on
 | Lockette | 1.7.2 / 1.7.3 | For CB 1.2.5-R5.0. |
 | Dynmap | 0.40 (or 0.38–0.60) | Compatible with 1.2.5. |
 | ZavAutoMessager | 1.8.4 | Explicitly for 1.2.5. |
-| Essentials + GroupManager | Essentials 2.9.2 (Tekkit build) | GroupManager jar that ships with it. Not yet installed. |
+| Essentials + GroupManager | Essentials 2.9.2 (Tekkit build) | GroupManager jar that ships with it. Not yet installed. Official last Bukkit GroupManager: [EssentialsGroupManager.jar](https://github.com/essentials/Essentials/releases/download/gm-final/EssentialsGroupManager.jar) (gm-final tag). |
 
 ### 1.5.2 (such as Blightfall or Hexxit)
 
@@ -172,4 +172,49 @@ Full command list is in [../commands.md](../commands.md). Key ones:
 Permission nodes are plugin-specific (e.g. `jobs.join.Miner`, `towny.command.town.new`, `worldguard.region.define`). Consult each plugin’s documentation or the permission lists that appear when you run commands as OP.
 
 After changing GroupManager files or commands, the new permissions take effect immediately for online players in most cases, or after the next login / `/manload`.
+
+## Essentials homes and the bed home (1.2.5 / Tekkit Classic)
+
+In the Essentials version that ships with Tekkit Classic (roughly 2.9.2), right-clicking a bed does **not** set the normal home used by plain `/home`. <br>
+It creates a special named home called `bed`.
+
+- `/home` (no arguments) teleports to the last location set with `/sethome`.
+- `/home bed` teleports to the last bed the player clicked.
+- The message “Home set.” when clicking a bed refers only to this special `bed` home.
+- Vanilla bed respawn is separate and still works.
+
+There is no `bed-sethome` option in this version’s `config.yml` (the EssentialsHome section only has `spawn-if-no-home`, `update-bed-at-daytime`, `world-home-permissions`, `sethome-multiple`, and `tpa-accept-cancellation`). <br>
+`update-bed-at-daytime` only controls whether the special bed home can be updated during the day.
+
+### Making beds the only way to set a home
+
+1. Disable the `/sethome` command in `plugins/Essentials/config.yml`:
+
+   ```yaml
+   disabled-commands:
+     - sethome
+   ```
+
+   Then run `/ess reload`.
+
+2. In GroupManager, give the Default (or player) group these nodes and **remove** `essentials.sethome` (and any `essentials.sethome.multiple.*` nodes):
+
+   - `essentials.home`
+   - `essentials.home.bed`
+   - `essentials.sethome.bed`
+
+   Example (as OP):
+
+   ```
+   /mangaddp Default essentials.home
+   /mangaddp Default essentials.home.bed
+   /mangaddp Default essentials.sethome.bed
+   /mangdelp Default essentials.sethome
+   /manload
+   ```
+
+Players can then set a home only by right-clicking a bed, and they reach it with `/home bed`. <br>
+Plain `/home` will not go to the bed home in this version.
+
+Player-facing commands for this are listed in [../player-commands.md](../player-commands.md).
 

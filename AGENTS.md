@@ -71,5 +71,6 @@ The restore documented in the markdown files targets an older Bukkit stack:
 Admin commands are in `commands.md`; player commands are in `player-commands.md`;
 plugin settings and GroupManager moderator setup are in
 `install-on-target-only/plugins.md`.
+Essentials bed-home behavior (special `bed` home vs `/sethome`) and the GroupManager nodes used to make beds the only home method are also documented there.
 
 GitHub: https://github.com/Hierosoft/nomcproxy

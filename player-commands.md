@@ -61,6 +61,29 @@ See your own resident information:
 /res
 ```
 
+## Essentials homes
+
+Teleport to your home:
+
+```
+/home
+```
+
+Teleport to the special bed home (set by right-clicking a bed):
+
+```
+/home bed
+```
+
+List your homes:
+
+```
+/homes
+```
+
+In the Tekkit Classic / 1.2.5 Essentials version, right-clicking a bed sets only the special named home `bed`. <br>
+Plain `/home` uses the location set by `/sethome`. See the notes in [install-on-target-only/plugins.md](https://github.com/Hierosoft/nomcproxy/blob/main/install-on-target-only/plugins.md) for how the server is configured so that beds are the intended way to set a home.
+
 ## Lockette
 
 Lock a chest: hold a sign and right-click the chest. The sign becomes:
