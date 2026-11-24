@@ -1105,3 +1105,9 @@ You've used whitespaee at the end of lines for markdown newlines. In https://gro
 I said the the planning documents are hidden. Provide AGENTS.md in chat as an attachment.
 
 You removed the trailing whitespace, but failed to replace "  " with " <br>" this time. Check your recent edits to plugins and player commands md files.
+
+Add a player-help-1.2.5.md . Add subheadings like mining depths specific to MC 1.2.5 or to Tekkit classic (GitHub-flavored) markdown table, build height, how to make different kinds of fences and gates, repair pendant, but for other core differences (For each difference from modern Minecraft that is in vanilla MC 1.2.5, make heading level 2 near the top, then make a separate heading level 2 for Tekkit Classic with deeper headings for things specific to it) link to wikis for further details instead of making the document too big.
+
+Add a player-help-1.5.2.md with a similar structure with a Hexxit 2nd level heading, and later a  Blightfall 2nd level heading. Use same philosophy: Succinct and using outlinks except with regard to core differences from modern Minecraft.
+
+You linked to https://minecraft.wiki/w/Altitude which is for modern Minecraft--those altitudes don't apply to 1.2.5 nor 1.5.2. Make sure you don't use any misleading modern Minecraft links.
