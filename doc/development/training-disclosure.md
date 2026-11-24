@@ -1122,3 +1122,7 @@ Make a player-help.md file and make the other player help files refer to it. Con
 - In to get &ahelp&r type &e/ticket&r then your message. The ticket will be sent even if moderators are offline.
 - To see the list of Tekkit Classic mods, see &nhttps://www.technicpack.net/modpack/tekkit.552560/mods&r
 - To go back to your last-used bed, type &n/home bed&r
+
+- 2026-11-23
+
+Add text after the links: Version-specific notes are in [player-help-1.2.5.md](https://github.com/Hierosoft/nomcproxy/blob/main/player-help-1.2.5.md) (such as Tekkit Classic) and [player-help-1.5.2.md](https://github.com/Hierosoft/nomcproxy/blob/main/player-help-1.5.2.md) (such as Hexxit & Blightfall)
