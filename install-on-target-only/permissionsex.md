@@ -8,7 +8,7 @@ See the Technic forum thread for the original discussion: https://forums.technic
 
 Use **PermissionsEx 1.19.3** (or the nearest 1.19.x build from the same era). <br>
 Later 1.22 / 1.23 releases on GitHub target Bukkit 1.7+ and are not compatible with 1.2.5. <br>
-Official BukkitDev / CurseForge hosting for the old files is no longer active. Download a 1.19.3 (or 1.19.5) jar from an archive (Wayback Machine of the old BukkitDev page) or a trusted community mirror. Place only the main `PermissionsEx.jar` in the plugins folder.
+Official BukkitDev / CurseForge hosting for the old files is no longer active. Download a 1.19.3 (or 1.19.5) jar from an archive ([Wayback Machine of the old BukkitDev files page](https://web.archive.org/web/*/https://dev.bukkit.org/projects/permissionsex/files)) or a trusted community mirror. Place only the main `PermissionsEx.jar` in the plugins folder.
 
 ## Installation steps
 

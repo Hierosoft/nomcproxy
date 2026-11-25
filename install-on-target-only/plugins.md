@@ -21,7 +21,8 @@ PermissionsEx is the recommended permissions plugin for 1.2.5 (see [permissionse
 | WorldGuard | 5.5.2 | Latest for 1.2.5. |
 | Lockette | 1.7.2 / 1.7.3 | For CB 1.2.5-R5.0. |
 | Dynmap | 0.40 (or 0.38–0.60) | Compatible with 1.2.5. |
-| ZavAutoMessager | 1.8.4 | Explicitly for 1.2.5. |
+| AutoMessage | 1.5 | Explicitly for CB 1.2.5-R4.0. Preferred over ZavAutoMessager. |
+| ObuShutTheHellUp | 0.4 | Log filter for CB 1.2.5. Useful for suppressing BuildCraft quarry NPE spam. |
 | Essentials + PermissionsEx | Essentials 2.9.2 (Tekkit build) | PermissionsEx 1.19.3 is recommended; see [permissionsex.md](permissionsex.md). GroupManager is an optional alternative (2.9.2 is no longer distributed; can be compiled). |
 
 ### 1.5.2 (such as Blightfall or Hexxit)
@@ -33,8 +34,124 @@ PermissionsEx is the recommended permissions plugin for 1.2.5 (see [permissionse
 | WorldGuard | 5.7.5 | Latest for 1.5.2. |
 | Lockette | 1.7.12 | For CB 1.5.2-R0.1. |
 | Dynmap | 1.7.1 (or nearby 1.7.x) | Compatible with 1.5.2. |
-| ZavAutoMessager | 2.5 | For 1.5.1/1.5.2. |
+| AutoMessage | 2.5.x (or nearby) | Later versions support JSON chat. |
 | Essentials + GroupManager | Essentials 2.11.1 | GroupManager jar that ships with it. Not yet installed. |
+
+## AutoMessage
+
+AutoMessage 1.5 is the recommended automatic chat messager for CraftBukkit 1.2.5 / Tekkit Classic. <br>
+Download: https://dev.bukkit.org/projects/automessage/files/603364/download (or the MineUniverse mirror of the same file). <br>
+Place the jar in the `plugins` folder and restart once so it generates `plugins/AutoMessage/config.yml`.
+
+Colors use standard `&` codes. Newlines inside a message use the literal `\n` sequence. <br>
+Messages that begin with `/` are executed as commands. <br>
+Clickable links and JSON chat components are **not** supported in this version (they were added years later). Format URLs with `&n` and/or place them on their own line with `\n`.
+
+Example structure (generic messages only):
+
+```yaml
+settings:
+  enabled: true
+  min-players: 0
+  log-to-console: false
+message-lists:
+  default:
+    enabled: true
+    random: false
+    interval: 180
+    messages:
+    - '&aExample tip about &aLockette&r.'
+    - 'Make money with &aJobs&r.\nType &e/jobs browse&r'
+    - 'Player commands: https://github.com/Hierosoft/nomcproxy/blob/main/player-help.md'
+```
+
+After editing, restart or run `/am reload` if the command is available.
+
+### ZavAutoMessager
+
+ZavAutoMessager 1.8.4 also runs on 1.2.5 but has several well-known pitfalls on that era of CraftBukkit:
+
+- The plugin rewrites `config.yml` on shutdown and strips single quotes from some lines.
+- Unquoted strings containing `:`, `&`, or `%n` then fail to parse or lose their meaning on the next load.
+- The update checker (when left enabled) can pull remote HTML and attempt to parse it as YAML, producing errors such as `expected '<document start>', but found Scalar` pointing at CSS fragments.
+- `%n` (the newline token) only works when `wordwrap: false`. Even then it is unreliable on 1.8.4 and often appears literally in chat.
+- Sequences like `&nhttp` or `&nhttps` are frequently eaten by the color-code / YAML handling.
+- A space immediately after a comma is sometimes eaten (e.g. "mods, see" becomes "mods,see").
+
+For these reasons AutoMessage 1.5 is preferred. If you still use ZavAutoMessager, use continuous single-line messages (no `%n`), set `wordwrap: false` and `updatechecking: false`, avoid color codes immediately before URLs, and re-apply single quotes after the plugin rewrites the file if needed.
+
+Working example (continuous messages, no newlines):
+
+```yaml
+# Default config for ZavAutoMessager.
+# Visit http://dev.bukkit.org/server-mods/zavautomessager/ for more help
+# Plugin created by the ZavCoding Team
+# Authors: javoris767 and zachoooo.
+# Make sure all your messages are inside of single quotes. (This makes sure that color and special characters work properly)
+# Word wrap is only in beta testing!!!
+# Update checking requires an internet connection.
+# Set update checking to false if you have no internet connection or you have a very strict firewall.
+
+enabled: true
+wordwrap: false
+delay: 240
+permissionsenabled: false
+chatformat: '[&6AutoMessager&f]: %msg'
+messageinrandomorder: false
+updatechecking: false
+messages:
+- 'Use &aLockette&r to protect your stuff: place sign on chest, above door (on iron
+  doors to avoid powering them)'
+- 'Protect blocks with &aTowny&r: Create a town, then gain and maintain power (through
+  survival) to keep block protection (except during wars)'
+- Make money with &aJobs&r (harvest, build, etc)! Type &e/jobs browse&r after joining a job you can see your stats using &e/jobs stats&r
+- 'Create elevators using &aLIFT&r: http://www.youtube.com/watch?v=k-IT_ULndbE'
+- To get &ahelp&r type &e/ticket&r then your message. The ticket will be sent even if moderators are offline.
+- 'List of Tekkit Classic mods: https://www.technicpack.net/modpack/tekkit.552560/mods'
+- To go back to your last-used bed, type &e/home bed&r
+- 'For player commands see: https://github.com/Hierosoft/nomcproxy/blob/main/player-help.md'
+```
+
+## ObuShutTheHellUp
+
+ObuShutTheHellUp 0.4 is a small log filter for CraftBukkit 1.2.5. <br>
+Download: https://dev.bukkit.org/projects/obushutthehellup/files/586347 <br>
+Place the jar in the `plugins` folder and restart once so it generates `plugins/ObuShutTheHellUp/filters.yml`.
+
+It has no reload command. After editing `filters.yml` you must restart the server for the changes to take effect.
+
+The file uses a JSON-like structure. Each filter is an object with `type`, `value`, and `level`. <br>
+`type: 'string'` matches a substring. `level` can be `'SEVERE'`, `'WARNING'`, `'INFO'`, or `'ANY'`.
+
+Example that suppresses the common BuildCraft quarry `BlockBreakEvent` NPEs from Jobs and Punishmental (while keeping the default “overloaded?” filter):
+
+```yaml
+{
+# ObuShutTheHellUp has a timed functionality that deals with incompatibilities with other plugins, this fixes other plugins that 'steal' the log filter.
+  activateTimer: false,
+# timerDelay > 0:  fix runs for the first time after <timerDelay> seconds
+  timerDelay: 5,
+# timerPeriod = 0: turned off - runs only once
+# timerPeriod > 0: turned on - fix runs every <timerPeriod> seconds after the first time
+  timerPeriod: 0,
+# type:
+#    'string' - log entry is filtered if this value is contained in the message's text.
+#    'regex' - log entry is filtered if the message's text matches at least once in the regular expression.
+# value:
+#    the value to be compared (either by string comparison or by regular expression)
+# level:
+#    'INFO'/'WARNING'/'FATAL'/'ANY'/etc - the value of the log level)
+    filters: [
+        { type: 'string', value: 'overloaded?', level: 'WARNING' },
+        { type: 'string', value: 'Could not pass event BlockBreakEvent to Jobs', level: 'SEVERE' },
+        { type: 'string', value: 'Could not pass event BlockBreakEvent to Punishmental', level: 'SEVERE' },
+        { type: 'string', value: 'JobsPaymentListener', level: 'ANY' },
+        { type: 'string', value: 'FallPlayerListener', level: 'ANY' }
+    ]
+}
+```
+
+These errors are caused by BuildCraft quarries firing `BlockBreakEvent` with a null or incomplete player. The filter only hides the log spam; it does not fix the underlying NullPointerException.
 
 ## Jobs (professions)
 

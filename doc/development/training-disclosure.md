@@ -1169,3 +1169,112 @@ Restore the Group Manager instructions as a separate section in plugins and comm
 It doesn't seem like we really need a separate level 2 heading in plugins.md and commands.md. All you did was change the title in some cases. In all cases where group permissions are discussed, make PermissionsEx is the main heading and that the instructions are compatible with it. Then Add a level 3 heading below it explaining that Group Manager is an alternative, and list the differences from the given instructions, or say that it operates the same way if so (but put the right folder name considering where configs reside if applicable).
 
 When you say no longer distributed, clarify by instead saying "2.9.2 is no longer distributed"
+
+- 2026-11-24
+
+Provide the wayback machine link to the page whenever you mentione wayback machine even if you don't know the exact date.
+
+- 2026-11-24 https://grok.com/project/b8272a8f-a09e-43d8-ad63-47993cc1b213?chat=b7a10fbf-4d56-48c7-9d1a-8e9f3da1a37f
+
+On Tekkit classic, lets try to (and see if we need to) fix:
+- paste errors
+
+Ok I installed the older version of skript. Before I start the server, let's diagnose ZAM futher:
+- paste YAML syntax error
+
+- paste same YAML syntax error (stuff not actually in the YAML file is shown, and it is css, so must be auto-updater)
+  - solution: disable automatic updates in ZavAutoMessager
+
+I said it reverts the quoting. See also screenshot with escape sequences showing which should not.
+- paste screenshot
+
+I said I did all that. Maybe you're just not accounting for how old this version is. Are there workarounds? Now it ate "&nhttp" and the opening sequence in the last item's link:
+- paste config.yaml
+
+lets get the more appropriate version. document how to get that version
+
+Is there any way to make the links clickable or format them in an AutoMessage-specific way in this early version of CB and AutoMessage? Translate my existing messages. Document AutoMessage in plugins.md, make a level 3 heading under it for ZavAutoMessager explaining the pitfalls. Do not put my server name nor any of my server-specific messages (except those linking to github) in our documentation.
+
+Ok, I started getting this error after removing ZavAutoMessager and installing AutoMessage so I switched back. However, after switching back I still get errors like this repeatedly, so maybe it is unrelated:
+```
+19:58:17 [SEVERE] Could not pass event BlockBreakEvent to Jobs
+org.bukkit.event.EventException
+        at org.bukkit.plugin.java.JavaPluginLoader$1.execute(JavaPluginLoader.java:304)
+        at org.bukkit.plugin.RegisteredListener.callEvent(RegisteredListener.java:62)
+        at org.bukkit.plugin.SimplePluginManager.fireEvent(SimplePluginManager.java:482)
+        at org.bukkit.plugin.SimplePluginManager.callEvent(SimplePluginManager.java:467)
+        at buildcraft.factory.TileQuarry.positionReached(TileQuarry.java:438)
+        at buildcraft.factory.EntityMechanicalArm.doMove(EntityMechanicalArm.java:183)
+        at buildcraft.factory.TileQuarry.q_(TileQuarry.java:146)
+        at net.minecraft.server.World.tickEntities(World.java:1190)
+        at net.minecraft.server.MinecraftServer.w(MinecraftServer.java:569)
+        at net.minecraft.server.MinecraftServer.run(MinecraftServer.java:467)
+        at net.minecraft.server.ThreadServerApplication.run(SourceFile:492)
+Caused by: java.lang.NullPointerException
+        at me.zford.jobs.bukkit.listeners.JobsPaymentListener.onBlockBreak(JobsPaymentListener.java:91)
+        at sun.reflect.GeneratedMethodAccessor80.invoke(Unknown Source)
+        at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+        at java.lang.reflect.Method.invoke(Method.java:498)
+        at org.bukkit.plugin.java.JavaPluginLoader$1.execute(JavaPluginLoader.java:302)
+        ... 10 more
+19:58:18 [SEVERE] Could not pass event BlockBreakEvent to Punishmental
+org.bukkit.event.EventException
+        at org.bukkit.plugin.java.JavaPluginLoader$1.execute(JavaPluginLoader.java:304)
+        at org.bukkit.plugin.RegisteredListener.callEvent(RegisteredListener.java:62)
+        at org.bukkit.plugin.SimplePluginManager.fireEvent(SimplePluginManager.java:482)
+        at org.bukkit.plugin.SimplePluginManager.callEvent(SimplePluginManager.java:467)
+        at buildcraft.factory.TileQuarry.positionReached(TileQuarry.java:438)
+        at buildcraft.factory.EntityMechanicalArm.doMove(EntityMechanicalArm.java:183)
+        at buildcraft.factory.TileQuarry.q_(TileQuarry.java:146)
+        at net.minecraft.server.World.tickEntities(World.java:1190)
+        at net.minecraft.server.MinecraftServer.w(MinecraftServer.java:569)
+        at net.minecraft.server.MinecraftServer.run(MinecraftServer.java:467)
+        at net.minecraft.server.ThreadServerApplication.run(SourceFile:492)
+Caused by: java.lang.NullPointerException
+        at sss.RjSowden.Fall.FallPlayerListener.onBlockBreak(FallPlayerListener.java:253)
+        at sun.reflect.GeneratedMethodAccessor68.invoke(Unknown Source)
+        at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+        at java.lang.reflect.Method.invoke(Method.java:498)
+        at org.bukkit.plugin.java.JavaPluginLoader$1.execute(JavaPluginLoader.java:302)
+        ... 10 more
+```
+Also, the old Skript isn't liking the newer metadata. I'm not sure if that's related. Only this uses it, and I can remove this and Skript: https://github.com/Poikilos/WildPortal/releases/tag/1.2.5.1
+Skript is saying no alias for ... (a slew of numbers), and saying there are syntax errors, apparently in WildPortal ("Leave Home", can't compare block to [some string] etc)
+
+Is there any log suppression configuration or plugin?
+
+Fix your syntax using the included default yml as a pattern:
+```
+# cat plugins/ObuShutTheHellUp/filters.yml
+{
+# ObuShutTheHellUp has a timed functionality that deals with incompatibilities with other plugins, this fixes other plugins that 'steal' the log filter.
+  activateTimer: false,
+# timerDelay > 0:  fix runs for the first time after <timerDelay> seconds
+  timerDelay: 5,
+# timerPeriod = 0: turned off - runs only once
+# timerPeriod > 0: turned on - fix runs every <timerPeriod> seconds after the first time
+  timerPeriod: 0,
+# type:
+#    'string' - log entry is filtered if this value is contained in the message's text.
+#    'regex' - log entry is filtered if the message's text matches at least once in the regular expression.
+# value:
+#    the value to be compared (either by string comparison or by regular expression)
+# level:
+#    'INFO'/'WARNING'/'FATAL'/'ANY'/etc - the value of the log level)
+    filters: [
+        { type: 'string', value: 'overloaded?', level: 'WARNING' }
+    ]
+}
+```
+
+is there a reload command for this plugin and version?
+
+Document the plugin and the exact settings in plugins.md.
+
+Before moving on to AutoMessage, lets further fix the ZavAutoMessager config.yml. There is no point it making it read only if it reads it wrong the first time! Lets just try to work around the bugs. See what worked (turned a different color) and what didn't (see visible escape sequences) in this screenshot and make a new config for ZavAutoMessager.
+- paste screenshot
+
+Ok, we are making progress, but there is more to do. See the new screenshot and see what worked (yellow text) and what didn't (escape sequences that are still visible). The Lockette message worked, as in the word "Lockette" was green, but it isn't included in this screenshot.
+- paste screenshot
+
+No, do not change line breaks into separate messages. Just make the messages continuous (no line break) if that's our only option.
