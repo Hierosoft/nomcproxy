@@ -1278,3 +1278,40 @@ Ok, we are making progress, but there is more to do. See the new screenshot and 
 - paste screenshot
 
 No, do not change line breaks into separate messages. Just make the messages continuous (no line break) if that's our only option.
+
+Good, but in "To see the list of Tekkit Classic mods, see" the space after the comma gets eaten. Document the following ZavAutoMessager settings:
+```
+# Default config for ZavAutoMessager.
+# Visit http://dev.bukkit.org/server-mods/zavautomessager/ for more help
+# Plugin created by the ZavCoding Team
+# Authors: javoris767 and zachoooo.
+# Make sure all your messages are inside of single quotes. (This makes sure that color and special characters work properly)
+# Word wrap is only in beta testing!!!
+# Update checking requires an internet connection.
+# Set update checking to false if you have no internet connection or you have a very strict firewall.
+
+enabled: true
+wordwrap: false
+delay: 240
+permissionsenabled: false
+chatformat: '[&6AutoMessager&f]: %msg'
+messageinrandomorder: false
+updatechecking: false
+messages:
+- 'Use &aLockette&r to protect your stuff: place sign on chest, above door (on iron
+  doors to avoid powering them)'
+- 'Protect blocks with &aTowny&r: Create a town, then gain and maintain power (through
+  survival) to keep block protection (except during wars)'
+- Make money with &aJobs&r (harvest, build, etc)! Type &e/jobs browse&r after joining a job you can see your stats using &e/jobs stats&r
+- 'Create elevators using &aLIFT&r: http://www.youtube.com/watch?v=k-IT_ULndbE'
+- To get &ahelp&r type &e/ticket&r then your message. The ticket will be sent even if moderators are offline.
+- 'List of Tekkit Classic mods: https://www.technicpack.net/modpack/tekkit.552560/mods'
+- To go back to your last-used bed, type &e/home bed&r
+- 'For player commands see: https://github.com/Hierosoft/nomcproxy/blob/main/player-help.md'
+```
+
+- 2026-11-25 https://grok.com/project/b8272a8f-a09e-43d8-ad63-47993cc1b213?chat=e50fd037-aea4-41df-b02b-46e04ae89268
+
+Document the commands to enable TP TPA for the Members group. Don't make those in a sample config--put them in a separate section. Document command for a user to see their own group.
+
+How can I turn off the prefix? How can I set up a way for bed to set the real "/home", not "/home bed"? And is there a way to do that without granting the /sethome command itself?

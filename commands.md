@@ -237,6 +237,31 @@ To make someone a moderator, typically:
 
 (Adjust the group name to match what is defined in `plugins/PermissionsEx/permissions.yml`.)
 
+### Enable teleport (TP / TPA) for the Member group
+
+Run these as OP or from the console (do not put them in the sample `permissions.yml`):
+
+```
+/pex group Member add essentials.tpa
+/pex group Member add essentials.tpaccept
+/pex group Member add essentials.tpdeny
+/pex group Member add essentials.tpahere
+```
+
+This lets members use `/tpa`, `/tpaccept`, `/tpdeny`, and `/tpahere`. <br>
+Do **not** grant `essentials.tp` (direct teleport) unless you want members to teleport without asking.
+
+### See your own group
+
+A player can see their own groups with:
+
+```
+/pex user <player>
+```
+
+(or `/pex user <player> group list`). <br>
+Replace `<player>` with their own name. The output lists the groups they belong to.
+
 ### GroupManager (alternative)
 
 (2.9.2 is no longer distributed but can be compiled. PermissionsEx is recommended.)

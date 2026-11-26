@@ -102,6 +102,25 @@ Run these from the console or as a player with the appropriate permissions.
 | `/pex users` | List users. |
 | `/pex groups` | List groups. |
 
+### Enable teleport (TP / TPA) for the Member group
+
+Run these as OP or from the console (do not add them to the sample config above):
+
+```
+/pex group Member add essentials.tpa
+/pex group Member add essentials.tpaccept
+/pex group Member add essentials.tpdeny
+/pex group Member add essentials.tpahere
+```
+
+### See your own group
+
+```
+/pex user <player>
+```
+
+(or `/pex user <player> group list`). Replace `<player>` with your own name.
+
 ### GroupManager (alternative)
 
 (2.9.2 is no longer distributed but can be compiled. PermissionsEx is recommended.)
