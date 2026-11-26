@@ -80,6 +80,14 @@ Full changelog and feature history: [Java Edition 1.2.5 – Minecraft Wiki](http
 Tekkit Classic is the Minecraft 1.2.5 modpack that adds IndustrialCraft, BuildCraft, Equivalent Exchange, Railcraft, and others. <br>
 Many extra blocks and items exist only in the pack.
 
+### Minimap (Rei’s Minimap)
+
+Tekkit Classic includes Rei’s Minimap. <br>
+Press **'** (apostrophe) for the large map. <br>
+Other keys (menu, waypoints, etc.) can be changed in the minimap options.
+
+See [Rei’s Minimap – Tekkit Classic Wiki](https://tekkitclassic.fandom.com/wiki/Rei%27s_Minimap).
+
 ### Fences and gates
 
 #### Iron Fence (IndustrialCraft²)

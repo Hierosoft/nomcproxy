@@ -35,6 +35,9 @@ The ticket will be sent even if moderators are offline.
 To see the list of Tekkit Classic mods, see: <br>
 https://www.technicpack.net/modpack/tekkit.552560/mods
 
+In Tekkit Classic, Rei’s Minimap is included. Press **'** (apostrophe) for the large map. <br>
+More notes are in [player-help-1.2.5.md](https://github.com/Hierosoft/nomcproxy/blob/main/player-help-1.2.5.md).
+
 ## Homes
 
 To go back to your last-used bed, type `/home bed`.

@@ -95,3 +95,26 @@ sudo iptables -D DOCKER -p tcp -d 172.18.0.2 ! -i pterodactyl0 -o pterodactyl0 -
 Once the LAN test works, run the setup scripts (target first, then proxy). <br>
 Only the proxy terminates HTTPS. The map will be at `https://dynmap.example.com`. <br>
 The target keeps Dynmap on plain HTTP; no subdomain is configured there.
+
+## Dynmap-Towny overlay
+
+Dynmap-Towny draws town and nation outlines on the map. It has no dedicated reload command. <br>
+Updates happen automatically on a timer (default 300 seconds / 5 minutes). The interval is set in:
+
+```
+plugins/Dynmap-Towny/config.yml
+```
+
+```yaml
+update:
+  period: 300
+```
+
+Lower the value (for example to 60) if you want faster updates, then run `/dynmap reload` (or restart) once so the new period takes effect. <br>
+To force an immediate redraw of the Towny overlays, run:
+
+```
+/dynmap reload
+```
+
+That reloads the whole Dynmap (including Dynmap-Towny) and can take a while on large maps. There is no lighter "just the Towny layer" command.

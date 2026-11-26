@@ -1315,3 +1315,37 @@ messages:
 Document the commands to enable TP TPA for the Members group. Don't make those in a sample config--put them in a separate section. Document command for a user to see their own group.
 
 How can I turn off the prefix? How can I set up a way for bed to set the real "/home", not "/home bed"? And is there a way to do that without granting the /sethome command itself?
+
+Is there any obscure mod that does it, or can I write one?
+- See from-scratch attempt: https://grok.com/c/187c313b-7df1-47a2-81b9-ee3b07709e49?rid=b43eec4d-3791-4c80-8c28-d75ad897fb9d
+- See planning: https://grok.com/project/85e4da7a-af65-41cd-bb02-ef1505e60dc0?tab=conversations&chat=1d2f7e9d-f65e-4a7e-a520-252fe385a47e
+
+- 2026-11-25 https://grok.com/project/b8272a8f-a09e-43d8-ad63-47993cc1b213?chat=26f8d564-5337-4630-aaec-7263b6d81bb5
+
+In Tekkit Classic why does towny say wilderness when I stand here but town when I type town?
+
+Ok, `/town here` says not claimed. How do extend the town to here?
+
+It is adjacent. If I type /t claim it says I must have an npc selected first.
+
+/t buy bonus 1 doesn't work (must select NPC). /town buy bonus 1 says 0 purchased for $0.
+
+would max_purchased_blocks 50 refer to actually 50 1x1xBuildHeight areas (1x1 meter??) or chunks? Or plots (and is a plot the size of 1 chunk)?
+
+It is actually plugins/Towny/settings/config.yml. It had `max_purchased_blocks: '-1'`  In single quotes. I change it to `max_purchased_blocks: '10'` and I still buy 0 for $0.
+
+I tried increasing the ratio above 8 as well, but it says Town Size is 8/7.
+My config:
+- paste plugins/Towny/settings/config.yml
+
+ok, it was `/ta reload` (said reloaded) not `/towny reload` (said nothing). Is there a way to refresh just Dynmap-Towny without doing a long reload of dynmap?
+
+Ok, document all this int appropriate project md file(s).
+
+provide AGENTS.md
+
+Reduce redundancy between the md files. For example, in plugins.md it is ok to say to reload a config after editing it, but all the pex commands should only be in commands.md. The commands.md can refer to the player-commands.md instead of being redundant as well, if applicable (commands that non-admin can do).
+
+Try to figure out what the /t command actually does in Tekkit Classic, since it keeps saying to select an NPC first. It doesn't at all have the same results as /town nor /towny.
+
+Document how to use Citizens 1.2.

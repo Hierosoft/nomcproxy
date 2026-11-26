@@ -54,17 +54,26 @@ Job names are case-sensitive. After manually editing the SQLite database, run `/
 
 ## Towny
 
-Wilderness and plot checks:
+Wilderness and plot checks (`/towny map`, `/town here`, `/plot`, `/res`) are player-facing; see [player-commands.md](player-commands.md).
+
+Claim an adjacent unclaimed chunk (must stand in it). Use the full command; the short `/t` alias is often intercepted by Citizens (NPC plugin) and requires an NPC to be selected first:
 
 ```
-/towny map
-/town here
-/res
-/res <player>
-/plot
+/town claim
 ```
 
-Reload settings (after editing config.yml or world .txt files):
+Buy extra claimable town blocks (bonus blocks). Again use the full command. In Towny 0.82 this frequently returns "0 purchased for $0" even when the town has money and the config allows purchases (especially after a previous `max_purchased_blocks: '-1'` unlimited setting). The admin workaround is:
+
+```
+/town buy bonus 1
+```
+
+```
+/townyadmin givebonus <town> <number>
+/ta givebonus <town> <number>
+```
+
+Reload settings (after editing `config.yml` or world `.txt` files). `/ta reload` works and reports success; `/towny reload` does nothing:
 
 ```
 /townyadmin reload
@@ -103,7 +112,7 @@ These also write into that world's `.txt` file:
 /tw toggle unclaimblockdelete
 ```
 
-The equivalent file settings are described in [install-on-target-only/plugins.md](install-on-target-only/plugins.md).
+The equivalent file settings (including town-block limits and purchased-bonus behavior) are described in [install-on-target-only/plugins.md](install-on-target-only/plugins.md).
 
 ## WorldGuard
 
@@ -136,27 +145,8 @@ Remove a region:
 
 ## Lockette
 
-Lock a chest (hold a sign, right-click the chest). The sign becomes:
-
-```
-[Private]
-<player>
-```
-
-Add another player (right-click the sign first, then):
-
-```
-/lockette <line> <player>
-```
-
-`<line>` is 3 or 4 on the first sign (line 2 is the owner). <br>
-For more than two extra players, place a second sign (it becomes `[More Users]`) and use `/lockette <line> <player>` on that sign.
-
-Remove a name from a line:
-
-```
-/lockette <line>
-```
+Player-facing lock and unlock commands are in [player-commands.md](player-commands.md). <br>
+There is no central yml that lists protected chests; protection is per-chest via signs.
 
 ## ZavAutoMessager
 
@@ -185,7 +175,14 @@ dynmap fullrender <world>
 
 (From the console, omit the leading `/`.)
 
-Default web port is 8123. After the port is published, the map is at `http://<server-ip>:8123`.
+Reload Dynmap (also forces Dynmap-Towny to redraw its town/nation overlays immediately). There is no lighter "reload only Dynmap-Towny" command:
+
+```
+/dynmap reload
+```
+
+Default web port is 8123. After the port is published, the map is at `http://<server-ip>:8123`. <br>
+Dynmap-Towny update interval and other overlay options are in `plugins/Dynmap-Towny/config.yml` (see [dynmap.md](dynmap.md) and [install-on-target-only/plugins.md](install-on-target-only/plugins.md)).
 
 ## PermissionsEx
 
@@ -253,36 +250,67 @@ Do **not** grant `essentials.tp` (direct teleport) unless you want members to te
 
 ### See your own group
 
-A player can see their own groups with:
+Do not grant `permissions.manage.membership` (or any `permissions.manage.*` node) to regular players. It allows editing group membership.
+
+Instead, set a chat prefix on the group so the rank appears next to the username. Players then see their group in chat with no extra permission:
 
 ```
-/pex user <player>
+/pex group Member prefix "&7[Member]&r "
+/pex group Moderator prefix "&c[Mod]&r "
+/pex group Admin prefix "&4[Admin]&r "
 ```
 
-(or `/pex user <player> group list`). <br>
-Replace `<player>` with their own name. The output lists the groups they belong to.
+(Adjust colors and labels to match your groups.) The prefix shows in chat automatically.
 
-### GroupManager (alternative)
+## Citizens (1.2 / 1.2.5)
 
-(2.9.2 is no longer distributed but can be compiled. PermissionsEx is recommended.)
+Citizens 1.x is the NPC plugin for Bukkit 1.2.5 / Tekkit Classic. <br>
+Most modification commands require an NPC to be selected first. The error “You must have an NPC selected first” means Citizens is handling the command.
 
-It operates the same way (groups of permission nodes, assign a player to a group). Differences:
+**Note:** In this setup Citizens intercepts the short `/t` alias. Always use the full `/town` (or `/ta`) for Towny. Do not rely on `/t` for Towny commands.
 
-- Config is in `plugins/GroupManager/worlds/<world>/groups.yml` and `plugins/GroupManager/worlds/<world>/users.yml` (plus `plugins/GroupManager/globalgroups.yml`), not `plugins/PermissionsEx/permissions.yml`.
-- Command mapping:
+Create an NPC (does not require a selection):
 
-  | PermissionsEx | GroupManager |
-  |---------------|--------------|
-  | `/pex user <player> group set <group>` | `/manuadd <player> <group>` |
-  | `/pex group <group> add <permission>` | `/mangaddp <group> <permission>` |
-  | `/pex group <group> remove <permission>` | `/mangdelp <group> <permission>` |
-  | `/pex group <group> create` | `/mangadd <group>` |
-  | `/pex groups` | `/listgroups` |
-  | `/pex reload` | `/manload` |
+```
+/npc create <name>
+```
 
-- `/manudel <player>` removes a player’s group-specific settings (they return to the default group). There is no direct PermissionsEx equivalent in the short list above; use `/pex user <player> group set <default-group>` instead.
-- The default group is often named **Default**.
+Select an existing NPC by ID (find the ID with `/npc list`):
 
-## Pterodactyl
+```
+/npc select <id>
+```
 
-Allocations are managed in the panel (Node → Allocations). After assigning a new port to a server you must restart the server so Wings recreates the container with the updated port mapping. There is no supported way to hot-add a published port to a running container.
+Once selected, common commands:
+
+```
+/npc
+/npc move
+/npc set <text>
+/npc add <text>
+/npc reset
+/npc lookat
+/npc talkclose
+/npc rename
+/npc color &<code>
+/npc remove
+/npc tp
+```
+
+List NPCs and get help:
+
+```
+/npc list
+/npc help
+```
+
+Admin / plugin control:
+
+```
+/citizens
+/citizens reload
+/citizens save
+```
+
+Full 1.x command and permission reference: https://wiki.citizensnpcs.co/index.php?title=1.x/Commands_and_Permissions <br>
+(Modern Citizens 2.x documentation does not apply to this version.)

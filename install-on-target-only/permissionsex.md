@@ -115,11 +115,18 @@ Run these as OP or from the console (do not add them to the sample config above)
 
 ### See your own group
 
+Do not grant `permissions.manage.membership` (or any `permissions.manage.*` node) to regular players. It allows editing group membership.
+
+Instead, set a chat prefix on the group so the rank appears next to the username. Players then see their group in chat with no extra permission:
+
 ```
-/pex user <player>
+/pex group Member prefix "&7[Member]&r "
+/pex group Moderator prefix "&c[Mod]&r "
+/pex group Admin prefix "&4[Admin]&r "
 ```
 
-(or `/pex user <player> group list`). Replace `<player>` with your own name.
+(Adjust colors and labels to match your groups.) The prefix shows in chat automatically. <br>
+No additional permission node is required for this.
 
 ### GroupManager (alternative)
 

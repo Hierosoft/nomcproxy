@@ -24,6 +24,7 @@ PermissionsEx is the recommended permissions plugin for 1.2.5 (see [permissionse
 | AutoMessage | 1.5 | Explicitly for CB 1.2.5-R4.0. Preferred over ZavAutoMessager. |
 | ObuShutTheHellUp | 0.4 | Log filter for CB 1.2.5. Useful for suppressing BuildCraft quarry NPE spam. |
 | Essentials + PermissionsEx | Essentials 2.9.2 (Tekkit build) | PermissionsEx 1.19.3 is recommended; see [permissionsex.md](permissionsex.md). GroupManager is an optional alternative (2.9.2 is no longer distributed; can be compiled). |
+| Citizens | 1.2 (1.x series) | NPC plugin compatible with 1.2.5. Intercepts short `/t` alias. See [../commands.md](../commands.md). |
 
 ### 1.5.2 (such as Blightfall or Hexxit)
 
@@ -173,6 +174,8 @@ The `new_world_settings` section in `config.yml` only applies to worlds that are
 
 ### `plugins/Towny/settings/config.yml`
 
+Towny claims are measured in **town blocks** (also called plots). Each town block is a 16×16 chunk (256 blocks horizontally) and spans the full world height. It is not a single 1×1 block.
+
 | Setting | What it controls | Notes |
 |---------|------------------|-------|
 | `price_town_upkeep` | Daily cost charged to each town | If a town cannot pay, it is removed and residents are kicked. Set to `0` to disable. |
@@ -181,8 +184,15 @@ The `new_world_settings` section in `config.yml` only applies to worlds that are
 | `using_economy` | Whether Towny uses an economy plugin | Must be true for taxes/upkeep to run. |
 | `using_permissions` | Whether Towny consults an external permissions plugin | When false, Towny relies more on its own internal rules. |
 | `delete_old_residents.enable` | Whether inactive residents are purged | Related options control the age threshold. |
+| `town_block_ratio` | Extra claimable blocks per resident (or 0 to ignore and use the town-level table) | In 0.82, `0` means use the `town_level` entries below. Changing it often requires `/ta reload` and may still show the old limit until the town data is refreshed. |
+| `max_purchased_blocks` | Hard cap on bonus blocks a town may buy | `-1` means unlimited. In 0.82 a previous `-1` can leave the town's purchased counter stuck at `-1`; subsequent purchases then return "0 purchased for $0" even after you set a positive number. Use `/ta givebonus <town> <n>` to force the extra blocks. |
+| `price_purchased_bonus_townblock` | Cost of each bonus town block | Only matters when purchases succeed. |
 | `new_world_settings.plot_management.revert_on_unclaim.enabled` | Default for new worlds: revert plots to a pre-claim snapshot when unclaimed | Does **not** change existing worlds. |
 | `new_world_settings.unclaimed.unclaimed_zone_build` (and destroy/switch/item_use) | Defaults for wilderness permissions on new worlds | Existing worlds use the `.txt` files instead. |
+
+Town level table (example): a 1-resident Settlement normally has `townBlockLimit: 16`. The in-game size display can show values like "8 / 7 [Bought: -1/-1]" when the purchased counter is stuck or the limit has not yet refreshed after a config change.
+
+### `plugins/Towny/data/worlds/<world>.txt`
 
 ### `plugins/Towny/data/worlds/<world>.txt`
 
@@ -212,6 +222,17 @@ Main file: `plugins/dynmap/configuration.txt`.
 
 After changing the port, restart the Minecraft server so the new value is picked up, and ensure the matching allocation is assigned in Pterodactyl (see [../dynmap.md](../dynmap.md)). The Minecraft listen port itself is set in `server.properties` — see [mc-settings.md](mc-settings.md).
 
+### Dynmap-Towny
+
+Town and nation outlines are drawn by the Dynmap-Towny addon. Its settings live in `plugins/Dynmap-Towny/config.yml`. The only frequently adjusted value is the update interval:
+
+```yaml
+update:
+  period: 300   # seconds between automatic overlay refreshes (default 5 minutes)
+```
+
+There is no dedicated reload command for Dynmap-Towny. Changes take effect after `/dynmap reload` (or a server restart). See also the Dynmap section of [../commands.md](../commands.md) and [../dynmap.md](../dynmap.md).
+
 ## ZavAutoMessager
 
 Main file: `plugins/ZavAutoMessager/config.yml`.
@@ -239,7 +260,8 @@ PermissionsEx is the recommended permissions plugin for Tekkit Classic / Bukkit 
 It lets you define groups (ranks) and assign players to them. Each group has a list of permission nodes. Players inherit the permissions of their primary group (and any groups it inherits). <br>
 This is how moderators, builders, and other roles are created without giving full operator status.
 
-Install and the basic `permissions.yml` layout are in [permissionsex.md](permissionsex.md). Use PermissionsEx 1.19.3 (later 1.22/1.23 builds are not compatible with 1.2.5).
+Install and the basic `permissions.yml` layout are in [permissionsex.md](permissionsex.md). Use PermissionsEx 1.19.3 (later 1.22/1.23 builds are not compatible with 1.2.5). <br>
+All commands (assigning groups, adding/removing nodes, reload, etc.) are documented in [../commands.md](../commands.md).
 
 ### Typical groups
 
@@ -256,39 +278,7 @@ You can rename or add groups. Everything lives in one file:
 
 (The root-directory `permissions.yml` is Bukkit’s own file; PermissionsEx ignores it.)
 
-### Creating a moderator
-
-1. Make sure a Moderator (or similar) group exists and has the desired permission nodes (e.g. `essentials.kick`, `essentials.mute`, `essentials.ban`, Towny or WorldGuard nodes as needed). <br>
-   Add nodes with `/pex group Moderator add essentials.kick` or by editing `permissions.yml` and running `/pex reload`.
-
-2. Assign the player:
-
-   ```
-   /pex user <player> group set Moderator
-   ```
-
-3. Reload if you edited the file by hand:
-
-   ```
-   /pex reload
-   ```
-
-The player should now have the group’s permissions without being OP. <br>
-Check with `/pex user <player>` or `/pex groups`.
-
-### Useful commands
-
-Full command list is in [../commands.md](../commands.md). Key ones:
-
-- `/pex user <player> group set <group>` – set primary group
-- `/pex group <group> add <node>` – add a permission node
-- `/pex group <group> remove <node>` – remove a permission node
-- `/pex reload` – reload configuration
-- `/pex groups` – show defined groups
-
-Permission nodes are plugin-specific (e.g. `jobs.join.Miner`, `towny.command.town.new`, `worldguard.region.define`). Consult each plugin’s documentation or the permission lists that appear when you run commands as OP.
-
-After changing `permissions.yml` or running these commands, the new permissions take effect after `/pex reload` (or on the next login).
+After editing `permissions.yml` by hand, run `/pex reload` (see [../commands.md](../commands.md)).
 
 ### GroupManager (alternative)
 
