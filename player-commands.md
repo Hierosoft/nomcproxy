@@ -61,6 +61,23 @@ See your own resident information:
 /res
 ```
 
+### Joining a town
+
+In this Towny 0.82 setup the working way for a mayor (or assistant) to add a player is:
+
+```
+/towny add <player>
+```
+
+(or `/town add <player>`). <br>
+The player then accepts with:
+
+```
+/accept
+```
+
+`/towny invite` reports that the invite is not registered and does not work. <br>
+Use the full `/town` or `/towny` form; the short `/t` alias is often intercepted by the Citizens NPC plugin.
 ## Essentials homes
 
 Teleport to your home:

@@ -20,9 +20,9 @@ maintains an nginx or Angie stream reverse-proxy configuration.
   must be re-run with `--pterodactyl` so port 443 on the proxy forwards to it.
 - `setup-minestat-discord-loop.py` / `minestat-discord-loop.py` — optional
   Discord status loop (proxy only).
-- `setup-dynmap-proxy.py` / `install-on-target-only/setup-dynmap-https.py` —
-  Dynmap HTTPS (terminated on the proxy).
-- `commands.md`, `player-commands.md`, `dynmap.md`, `discord.md`,
+- `install-on-target-only/check-plugin-version.py` — print the name and
+  version of a Minecraft plugin jar (errors if the jar has no plugin.yml).
+- `commands.md`, `player-commands.md`, `player-help.md`, `player-help-1.2.5.md`, `player-help-1.5.2.md`, `dynmap.md`, `discord.md`,
   `install-on-target-only/plugins.md`, `install-on-target-only/mc-settings.md`,
   `install-on-target-only/server.md` — documentation.
 
@@ -63,14 +63,17 @@ maintains an nginx or Angie stream reverse-proxy configuration.
 ## Minecraft context (Tekkit Classic / 1.2.5 era)
 
 The restore documented in the markdown files targets an older Bukkit stack:
-- Towny 0.82
+- Towny 0.82 (town blocks are 16×16 chunks full height; `/t` is often intercepted by Citizens; `/town buy bonus` frequently returns 0 for $0 after a prior `max_purchased_blocks: '-1'` — use `/ta givebonus`; only `/ta reload` works; join flow is `/towny add <player>` then `/accept`, not `/towny invite`)
 - Jobs (phrstbrn version, SQLite storage)
-- Essentials GroupManager (the version compatible with that era)
-- WorldGuard, Lockette, Dynmap, ZavAutoMessager
+- PermissionsEx (recommended for 1.2.5; GroupManager is an optional alternative)
+- WorldGuard, Lockette, Dynmap, AutoMessage (ZavAutoMessager is an alternative with known config pitfalls)
+- Dynmap-Towny (no dedicated reload; update interval in `plugins/Dynmap-Towny/config.yml`; force redraw with `/dynmap reload`)
+- Citizens 1.2 (NPC plugin; intercepts short `/t` alias so Towny commands must use full `/town`; select NPC first for most commands)
 
 Admin commands are in `commands.md`; player commands are in `player-commands.md`;
-plugin settings and GroupManager moderator setup are in
-`install-on-target-only/plugins.md`.
-Essentials bed-home behavior (special `bed` home vs `/sethome`) and the GroupManager nodes used to make beds the only home method are also documented there.
+plugin settings and PermissionsEx (with GroupManager as an alternative) are in
+`install-on-target-only/plugins.md`. Dynmap setup and Dynmap-Towny overlay notes
+are in `dynmap.md`. <br>
+Essentials bed-home behavior (special `bed` home vs `/sethome`) and the PermissionsEx nodes used to make beds the only home method are also documented there.
 
 GitHub: https://github.com/Hierosoft/nomcproxy

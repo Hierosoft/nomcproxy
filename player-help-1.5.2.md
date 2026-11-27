@@ -4,69 +4,8 @@ Short notes on differences from modern Minecraft that affect everyday play. <br>
 This is a version-specific supplement to the main [player-help.md](player-help.md). <br>
 For full details follow the wiki links. This page is not a complete guide.
 
-## Build height
-
-In Minecraft 1.5.2 the world is still 256 blocks tall (Y=0 to Y=255). <br>
-You can place blocks up to Y=255. Natural terrain generation mostly stays well below that. <br>
-(Modern Minecraft raised the limit further and added negative Y levels.)
-
-The height limit was raised from 128 to 256 in 1.2.1 with the Anvil world format and remained 256 in 1.5.2. <br>
-See [Java Edition 1.2.1 – Minecraft Wiki](https://minecraft.wiki/w/Java_Edition_1.2.1) for the height change.
-
-## Mining depths
-
-Approximate best levels for branch mining in vanilla 1.5.2 (Y = the level under your feet in a 2-high tunnel). <br>
-Ore distribution is essentially the same as in 1.2.5:
-
-| Ore | Best Y range | Notes |
-|-----|--------------|-------|
-| Diamond | 10–16 | Most common near Y=12. |
-| Redstone | 10–16 | Same general band as diamond. |
-| Gold | 1–32 | Even distribution in this range. |
-| Iron | 1–64 | More common higher up. |
-| Coal | 1–128 | Abundant at almost any depth. |
-| Lapis | ~16 | Centered around Y=16. |
-
-Lava lakes become common below ~Y=10. <br>
-Always check the F3 debug screen for your exact Y coordinate.
-
-Ore distribution in this era is the same as 1.2.5; the modern [Ore](https://minecraft.wiki/w/Ore) page shows current generation and does not apply.
-
-## Fences and gates
-
-### Wooden fence
-6 sticks in two vertical columns. Connects to other wooden fences and fence gates. <br>
-Mobs cannot jump over a single fence. Collision box is 1.5 blocks tall.
-
-| | | |
-|---|---|---|
-| | 🪵 | 🪵 |
-| | 🪵 | 🪵 |
-| | 🪵 | 🪵 |
-
-### Nether brick fence
-6 nether bricks. Fireproof and stronger. Generates in nether fortresses. <br>
-Does not visually connect directly to wooden fences (use a gate between them).
-
-| | | |
-|---|---|---|
-| | 🧱 | 🧱 |
-| | 🧱 | 🧱 |
-| | 🧱 | 🧱 |
-
-### Fence gate
-4 sticks + 2 wooden planks. Opens by right-click or redstone. <br>
-Connects to both wooden and nether brick fences.
-
-| | | |
-|---|---|---|
-| | | |
-| 🪵 | 🪵 | 🪵 |
-| 🪵 | 🪵 | 🪵 |
-
-**Emoji key (vanilla):** 🪵 Stick or Wooden Planks · 🧱 Nether Brick
-
-See [Fence – Minecraft Wiki](https://minecraft.wiki/w/Fence) and [Fence Gate – Minecraft Wiki](https://minecraft.wiki/w/Fence_Gate).
+Many core mechanics (build height, mining depths, fences and gates, basic XP sources before later additions) are the same as in 1.2.5. <br>
+See [player-help-1.2.5.md](player-help-1.2.5.md) for those sections. The notes below cover only what is different or pack-specific.
 
 ## Other notable vanilla differences
 

@@ -66,14 +66,55 @@ Connects to both wooden and nether brick fences.
 
 See [Fence – Minecraft Wiki](https://minecraft.wiki/w/Fence) and [Fence Gate – Minecraft Wiki](https://minecraft.wiki/w/Fence_Gate).
 
-## Other notable vanilla differences
+## Experience (XP)
 
-- Stairs do not automatically form corners the way modern stairs do.
-- Fewer wood types (oak, spruce, birch, jungle only).
-- No shields, no off-hand, no sprint-jump changes that came later.
-- Beds set spawn point; Essentials may also create a special named “bed” home (see [player-commands.md](player-commands.md)).
+In Minecraft 1.2.5 / Tekkit Classic the main ways to gain experience orbs are different from modern versions.
 
-Full changelog and feature history: [Java Edition 1.2.5 – Minecraft Wiki](https://minecraft.wiki/w/Java_Edition_1.2.5).
+You do **not** get XP from:
+- Catching a fish (fishing XP was added later, in 1.4.2).
+- Breeding animals (breeding XP was added in 1.3.1).
+- Smelting or cooking food in a furnace (smelting XP was added in 1.3.1).
+- Mining ores such as coal, iron, gold, diamond, redstone, or lapis (ore mining XP was added in 1.3.1).
+
+### How to get XP
+
+Kill mobs. Hostile mobs give more XP than passive ones. <br>
+Baby animals and some other entities give none.
+
+Throw a Bottle o’ Enchanting (added in 1.2.1). Each bottle gives 3–11 XP when broken. <br>
+These are mainly useful in creative or adventure maps; they are not a normal survival source.
+
+### XP sources (highest to lowest)
+
+Approximate values that apply in this version. Hostile mobs give more if they spawn with equipment.
+
+| Source | XP |
+|--------|----|
+| Ender Dragon (first kill) | 12,000 |
+| Blaze | 10 |
+| Hostile mobs (zombie, skeleton, creeper, spider, enderman, etc.) | 5 (+ 1–3 per equipment) |
+| Large slime / magma cube | 4 |
+| Medium slime / magma cube | 2 |
+| Small slime / magma cube | 1 |
+| Passive animals (cow, pig, chicken, sheep, etc.) | 1–3 |
+| Bottle o’ Enchanting | 3–11 |
+| Baby animals, bats, villagers, golems | 0 |
+
+Killing the Ender Dragon (if the End is accessible) is by far the largest single source. <br>
+For everyday play, hunting hostile mobs is the practical way to gain levels for enchanting.
+
+## Book
+
+In Minecraft 1.2.5 a book is crafted with 3 paper in a vertical column (no leather). <br>
+The leather requirement and shapeless recipe arrived later (1.3.1).
+
+| | | |
+|---|---|---|
+| | 📄 | |
+| | 📄 | |
+| | 📄 | |
+
+**Emoji key:** 📄 Paper
 
 ## Tekkit Classic
 

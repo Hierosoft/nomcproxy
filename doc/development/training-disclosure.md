@@ -1349,3 +1349,9 @@ Reduce redundancy between the md files. For example, in plugins.md it is ok to s
 Try to figure out what the /t command actually does in Tekkit Classic, since it keeps saying to select an NPC first. It doesn't at all have the same results as /town nor /towny.
 
 Document how to use Citizens 1.2.
+
+Explain how to add someone to the town. Does mayor have to do it?
+
+/towny invite just said the invite is not registered. I had to do /towny add <player> then they could do /accept. Explain just that in the player commands md. Where 1.2.5 and 1.5.2 are redundant, remove the information from the 1.5.2 document and refer the reader to the 1.2.5 document and say what hasn't changed. Explain how to get experience in the player guide for 1.2.5. Mention that you don't get experience from catching a fish, etc, and other ways you dont' get XP in Tekkit Classic. Explain which mining and cooking/smelting activities give XP. Add additional ways to get XP in Tekkit Classic if any. You can mention killing mobs, and say whether hostile and/or passive, whatever gives XP in this version, but don't need to list out mobs or go into detail. However, you can make a table of all XP sources from highest to lowest gains.
+
+The book recipe is different in 1.2.5 (3 paper vertically) so emoji grid the recipe in that md, but you don't have to mention the book recipe at all in the 1.5.2 md.
